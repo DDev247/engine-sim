@@ -20,12 +20,13 @@
 #include <stdlib.h>
 #include <sstream>
 
+#include "../include/logger.h"
 
 #if ATG_ENGINE_DISCORD_ENABLED
 #include "../discord/Discord.h"
 #endif
 
-std::string EngineSimApplication::s_buildVersion = "0.1.7a";
+std::string EngineSimApplication::s_buildVersion = "0.1.7a_turboDDev";
 
 
 EngineSimApplication::EngineSimApplication() {
@@ -276,7 +277,6 @@ void EngineSimApplication::initialize() {
     DiscordRichPresence passMe = { 0 };
     GetDiscordManager()->SetStatus(passMe, m_iceEngine->getName(), s_buildVersion);
 #endif
-
 }
 
 int messageStage = 0;
@@ -310,10 +310,10 @@ void EngineSimApplication::process(float frame_dt) {
     }
 
     if (m_engine.ProcessKeyDown(ysKey::Code::P)) {
+        isPSI = !isPSI;
+        
         if (m_simulator.m_turbocharger.IS_ENABLED == false && messageStage != 3)
         {
-            isPSI = !isPSI;
-
             if(isPSI)
                 m_infoCluster->setLogMessage("Boost Units: PSI");
             else
@@ -496,6 +496,11 @@ float EngineSimApplication::unitsToPixels(float units) const {
     return units * f;
 }
 
+bool agressive = false;;
+double agressiveTime = 0;
+const double maxAgressiveTime = 2.0;
+int ita = 0;
+
 void EngineSimApplication::run() {
     double throttle = 1.0;
     double targetThrottle = 1.0;
@@ -638,7 +643,7 @@ void EngineSimApplication::run() {
             const double newVal = clamp(m_simulator.m_turbocharger.wastegateTrigger + mouseWheelDelta * rate * dt, 0.1, 150);
             m_simulator.m_turbocharger.wastegateTrigger = newVal;
 
-            m_infoCluster->setLogMessage("[0] - Set wastegate to " + std::to_string(m_simulator.m_turbocharger.wastegateTrigger));
+            m_infoCluster->setLogMessage("[0] - Set wastegate to " + std::to_string(m_simulator.m_turbocharger.wastegateTrigger / m_simulator.m_turbocharger.outputPressDiv) + " Bar");
             fineControlInUse = true;
         }
 
@@ -749,7 +754,102 @@ void EngineSimApplication::run() {
                 : "IGNITION DISABLED";
             m_infoCluster->setLogMessage(msg);
         }
+        /*
+        double rpm = m_simulator.getEngine()->getRpm();
+        double redline = units::toRpm(m_simulator.getEngine()->getRedline());
 
+        double lowRpmDown = redline / 7;
+        double highRpmDown = redline / 2;
+
+        double lowRpmUp = redline / 3;
+        double highRpmUp = redline - 2500;
+
+        double currentUp;
+        double currentDown;
+        double throt = (throttle * -1) + 1;
+        if (throt >= 0.9 || agressive)
+        {
+            currentDown = highRpmDown;
+            currentUp = highRpmUp;
+
+            if (throt >= 0.5)
+                agressiveTime += dt;
+            else
+                agressive -= dt;
+
+            agressive = true;
+            if (agressiveTime >= maxAgressiveTime)
+            {
+                agressiveTime = maxAgressiveTime;
+            }
+        }
+        else
+        {
+            currentDown = lowRpmDown;
+            currentUp = lowRpmUp;
+        }
+
+        Logger::DebugLine(std::to_string(agressive));
+        Logger::DebugLine(std::to_string(agressiveTime));
+        */
+        /*
+        bool shiftUpNow = false;
+        if (ita >= 1)
+        {
+            Logger::DebugLine("rpm: " + std::to_string(rpm) + "/" + std::to_string(redline));
+            ita = 0;
+        }
+        ita++;
+        
+        if (throttle > 0.9) // agressive
+        {
+            agressive = true;
+            agressiveTime += dt;
+            if (agressiveTime >= maxAgressiveTime)
+            {
+                agressiveTime = maxAgressiveTime;
+            }
+        }
+        else
+        {
+            if (agressiveTime > 0)
+                agressiveTime -= dt;
+            else if (agressiveTime <= 0)
+            {
+                // no more agressive
+                agressive = false;
+                agressiveTime = 0;
+            }
+        }
+
+        if (agressive)
+        {
+            if (rpm >= redline - 2000)
+                shiftUpNow = true;
+        }
+        else
+        {
+            if (rpm >= redline / 2)
+                shiftUpNow = true;
+        }
+
+        bool shiftDownNow = false;
+        if (agressive) 
+        {
+            if (rpm <= (redline / 2))
+            {
+                shiftDownNow = true;
+            }
+        }
+        else
+        {
+            if (rpm >= (redline / 2) - 1500)
+                shiftUpNow = true;
+        }
+        */
+
+        // || rpm >= currentUp && m_simulator.getTransmission()->getGear() != -1
+        //  || rpm <= currentDown && m_simulator.getTransmission()->getGear() != 0
         if (m_engine.ProcessKeyDown(ysKey::Code::Up)) {
             m_simulator.getTransmission()->changeGear(m_simulator.getTransmission()->getGear() + 1);
 

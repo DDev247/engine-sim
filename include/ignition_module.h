@@ -45,6 +45,9 @@ class IgnitionModule : public Part {
         double m_revLimitTimer;
         Function* m_timingCurve;
 
+        bool retardTiming = false;
+        double m_limiterDuration;
+
     protected:
         SparkPlug *getPlug(int i);
 
@@ -53,7 +56,7 @@ class IgnitionModule : public Part {
         int m_cylinderCount;
 
         double m_lastCrankshaftAngle;
-        double m_limiterDuration;
+
 };
 
 #endif /* ATG_ENGINE_SIM_IGNITION_MODULE_H */

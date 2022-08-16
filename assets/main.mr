@@ -1,6 +1,7 @@
 import "engine_sim.mr"
 import "engines/kohler/kohler_ch750.mr"
-import "engines/custom/w3singlejournal.mr"
+import "engines/chevrolet/chev_truck_454.mr"
+import "engines/custom/lawnmower.mr"
 
 set_engine(
     engine: kohler_ch750()

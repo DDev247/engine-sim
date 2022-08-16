@@ -10,8 +10,8 @@
 #include "starter_motor.h"
 #include "derivative_filter.h"
 #include "vehicle_drag_constraint.h"
-#include "../build/procharger.h"
-#include "../build/turbocharger.h"
+#include "procharger.h"
+#include "turbocharger.h"
 
 #include "scs.h"
 

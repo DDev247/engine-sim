@@ -74,6 +74,7 @@ void IgnitionModule::update(double dt) {
     }
 
     m_revLimitTimer -= dt;
+    
     if (std::fabs(m_crankshaft->m_body.v_theta) > m_revLimit) {
         m_revLimitTimer = m_limiterDuration;
     }
@@ -96,7 +97,13 @@ void IgnitionModule::resetIgnitionEvents() {
 }
 
 double IgnitionModule::getTimingAdvance() {
-    return m_timingCurve->sampleTriangle(-m_crankshaft->m_body.v_theta);
+    if(!retardTiming)
+        return m_timingCurve->sampleTriangle(-m_crankshaft->m_body.v_theta);
+    else
+    {
+        double rpm = m_crankshaft->m_body.v_theta;
+        return m_timingCurve->sampleTriangle(-m_crankshaft->m_body.v_theta) + 450;
+    }
 }
 
 IgnitionModule::SparkPlug *IgnitionModule::getPlug(int i) {

@@ -21,10 +21,9 @@ public node chev_truck_454 {
     wires wires()
 
     engine engine(
-        name: "Custom V4",
-        starter_torque: 300 * units.lb_ft,
-        redline: 10500 * units.rpm,
-		starter_speed: 1000 * units.rpm,
+        name: "Chev. 454 V8",
+        starter_torque: 200 * units.lb_ft,
+        redline: 5500 * units.rpm,
         fuel: fuel(
             max_turbulence_effect: 3.0,
             burning_efficiency_randomness: 0.5,
@@ -32,7 +31,7 @@ public node chev_truck_454 {
     )
 
     crankshaft c0(
-        throw: 60 * units.mm,
+        throw: 2.0 * units.inch,
         flywheel_mass: 29 * 2 * units.lb,
         mass: 75 * units.lb,
         friction_torque: 10.0 * units.lb_ft,
@@ -82,7 +81,7 @@ public node chev_truck_454 {
 
     exhaust_system_parameters es_params(
         outlet_flow_rate: k_carb(550.0),
-        primary_tube_length: 1.0 * units.inch,
+        primary_tube_length: 10.0 * units.inch,
         primary_flow_rate: k_carb(90.0),
         velocity_decay: 1.0, //0.5
         volume: 50.0 * units.L
@@ -109,7 +108,22 @@ public node chev_truck_454 {
             exhaust_system: exhaust0,
             ignition_wire: wires.wire3
         )
-
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.6)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj2,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire5
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.4)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj3,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire7
+        )
 
     cylinder_bank b1(bank_params, angle: 45.0 * units.deg)
     b1
@@ -129,8 +143,22 @@ public node chev_truck_454 {
             exhaust_system: exhaust1,
             ignition_wire: wires.wire4
         )
-
-
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.6)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj2,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire6
+        )
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.6)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj3,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire8
+        )
 
     engine
         .add_cylinder_bank(b0)
@@ -163,16 +191,12 @@ public node chev_truck_454 {
         .add_sample(4000 * units.rpm, 38 * units.deg)
         .add_sample(5000 * units.rpm, 38 * units.deg)
         .add_sample(6000 * units.rpm, 38 * units.deg)
-		.add_sample(7000 * units.rpm, 48 * units.deg)
-		.add_sample(8000 * units.rpm, 58 * units.deg)
-		.add_sample(9000 * units.rpm, 68 * units.deg)
-		.add_sample(10000 * units.rpm, 78 * units.deg)
 
     engine.add_ignition_module(
         chevy_bbc_distributor(
             wires: wires,
             timing_curve: timing_curve,
-            rev_limit: 9000 * units.rpm
+            rev_limit: 7000 * units.rpm
         )
     )
 }

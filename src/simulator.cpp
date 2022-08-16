@@ -43,7 +43,6 @@ Simulator::~Simulator() {
     assert(m_crankshaftFrictionConstraints == nullptr);
     assert(m_system == nullptr);
     assert(m_exhaustFlowStagingBuffer == nullptr);
-    assert(m_turbo == nullptr);
 }
 
 void Simulator::initialize(const Parameters &params) {
@@ -363,6 +362,7 @@ bool Simulator::simulateStep() {
     const double fluidTimestep = timestep / m_fluidSimulationSteps;
 
     const bool procharger = false;
+    m_turbocharger.throttle = (m_engine->getThrottle() * -1) + 1;
 
     for (int i = 0; i < m_fluidSimulationSteps; ++i) {
         for (int j = 0; j < exhaustSystemCount; ++j) {
@@ -429,25 +429,23 @@ bool Simulator::simulateStep() {
     {
         if (!procharger)
         {
-            if (m_turbocharger.spool < 2)
+            if (m_turbocharger.spool < m_turbocharger.wastegateTrigger)
             {
                 m_turbocharger.spool += m_turbocharger.antilagBoost;
                 // retard the timing cuz why not
-                m_engine->getIgnitionModule()->m_revLimit = m_engine->getRpm();
-                m_engine->getIgnitionModule()->m_revLimitTimer = 0.25;
+                m_engine->getIgnitionModule()->retardTiming = true;
             }
             else
             {
-                m_engine->getIgnitionModule()->m_revLimit = revLimit;
-                m_engine->getIgnitionModule()->m_revLimitTimer = revTimer;
+                m_engine->getIgnitionModule()->retardTiming = false;
             }
         }            
     }
     else
     {
-        m_engine->getIgnitionModule()->m_revLimit = revLimit;
-        m_engine->getIgnitionModule()->m_revLimitTimer = revTimer;
+        m_engine->getIgnitionModule()->retardTiming = false;
     }
+    m_engine->getIgnitionModule()->m_limiterDuration = 0.02;
 
     im->resetIgnitionEvents();
 

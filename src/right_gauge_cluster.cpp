@@ -82,7 +82,13 @@ void RightGaugeCluster::initialize(EngineSimApplication *app) {
     m_speedometer->m_gauge->m_gamma = 1.0f;
     m_speedometer->m_gauge->m_needleKs = 1000.0f;
     m_speedometer->m_gauge->m_needleKd = 20.0f;
-    m_speedometer->m_gauge->setBandCount(0);
+    m_speedometer->m_gauge->setBandCount(2);
+
+    m_speedometer->m_gauge->setBand(
+        { m_app->getBlue(), 25, 60, 3.0f, 6.0f, shortenAngle, -shortenAngle }, 0);
+
+    m_speedometer->m_gauge->setBand(
+        { m_app->getRed(), 260, 320, 3.0f, 6.0f, shortenAngle, -shortenAngle }, 1);
 
     /* INHG
     m_manifoldVacuumGauge->m_title = "MANIFOLD PRESSURE";
@@ -119,32 +125,38 @@ void RightGaugeCluster::initialize(EngineSimApplication *app) {
 
     m_manifoldVacuumGauge->m_title = "MANIFOLD PRESSURE";
     m_manifoldVacuumGauge->m_unit = "Bar";
-    m_manifoldVacuumGauge->m_precision = 0;
+    m_manifoldVacuumGauge->m_precision = 2;
     m_manifoldVacuumGauge->setLocalPosition({ 0, 0 });
     m_manifoldVacuumGauge->m_gauge->m_min = -1;
     m_manifoldVacuumGauge->m_gauge->m_max = 5;
     m_manifoldVacuumGauge->m_gauge->m_minorStep = 1;
     m_manifoldVacuumGauge->m_gauge->m_majorStep = 1;
-    m_manifoldVacuumGauge->m_gauge->m_maxMinorTick = 200;
+    m_manifoldVacuumGauge->m_gauge->m_maxMinorTick = 1;
     m_manifoldVacuumGauge->m_gauge->m_thetaMin = (float)constants::pi * 1.2f;
     m_manifoldVacuumGauge->m_gauge->m_thetaMax = -(float)constants::pi * 0.2f;
     m_manifoldVacuumGauge->m_gauge->m_needleWidth = 4.0f;
     m_manifoldVacuumGauge->m_gauge->m_gamma = 1.0f;
     m_manifoldVacuumGauge->m_gauge->m_needleKs = 1000.0f;
     m_manifoldVacuumGauge->m_gauge->m_needleKd = 50.0f;
-    m_manifoldVacuumGauge->m_gauge->setBandCount(4);
+    m_manifoldVacuumGauge->m_gauge->setBandCount(6);
 
     m_manifoldVacuumGauge->m_gauge->setBand(
-        { m_app->getBlue(), -1, -0.2, 3.0f, 6.0f, shortenAngle, shortenAngle }, 0);
+        { m_app->getBlue(), -1, -0.4, 3.0f, 6.0f, shortenAngle, shortenAngle }, 0);
 
     m_manifoldVacuumGauge->m_gauge->setBand(
-        { m_app->getWhite(), -0.2, 0, 3.0f, 6.0f, shortenAngle, shortenAngle }, 1);
+        { m_app->getWhite(), -0.4, 0, 3.0f, 6.0f, shortenAngle, shortenAngle }, 1);
 
     m_manifoldVacuumGauge->m_gauge->setBand(
-        { m_app->getGreen(), 0, 1, 3.0f, 6.0f, shortenAngle, shortenAngle }, 2);
+        { m_app->getGreen(), 0, 2, 3.0f, 6.0f, shortenAngle, shortenAngle }, 2);
 
     m_manifoldVacuumGauge->m_gauge->setBand(
-        { m_app->getRed(), 3.5, 5, 3.0f, 6.0f, shortenAngle, shortenAngle }, 3);
+        { m_app->getYellow(), 2, 3, 3.0f, 6.0f, shortenAngle, shortenAngle }, 3);
+
+    m_manifoldVacuumGauge->m_gauge->setBand(
+        { m_app->getOrange(), 3, 4, 3.0f, 6.0f, shortenAngle, shortenAngle }, 4);
+
+    m_manifoldVacuumGauge->m_gauge->setBand(
+        { m_app->getRed(), 4, 5, 3.0f, 6.0f, shortenAngle, shortenAngle }, 5);
 
     m_volumetricEffGauge->m_title = "VOLUMETRIC EFF.";
     m_volumetricEffGauge->m_unit = "%";
