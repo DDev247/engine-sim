@@ -43,7 +43,6 @@ The UI is extremely minimalistic and there are only a few controls used to inter
 | Space + Scroll | Fine throttle adjustment |
 | 1, 2, 3, 4, 5 | Simulation time warp |
 | Tab | Change screen |
-
 | L | Hold Antilag |
 | K | Toggle Turbocharger |
 | J | Change Messages |
