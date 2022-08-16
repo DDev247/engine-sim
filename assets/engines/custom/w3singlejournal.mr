@@ -1,0 +1,250 @@
+import "engine_sim.mr"
+import "../../part-library/part_library.mr"
+
+units units()
+constants constants()
+
+private node wires {
+	output wire1: ignition_wire();
+	output wire2: ignition_wire();
+	output wire3: ignition_wire();
+}
+
+label cycle(2 * 360 * units.deg)
+public node w3ignition {
+    input wires;
+    input timing_curve;
+    input rev_limit: 8000 * units.rpm;
+    input limiter_duration: 0.05 * units.sec;
+    alias output __out:
+        ignition_module(timing_curve: timing_curve, rev_limit: rev_limit, limiter_duration: limiter_duration)
+            .connect_wire(wires.wire1, (420) * units.deg)
+		.connect_wire(wires.wire2, (0) * units.deg)
+		.connect_wire(wires.wire3, (315) * units.deg);
+}
+
+public node w3_cam_lobe_profile {
+	alias output __out:
+		harmonic_cam_lobe(
+			duration_at_50_thou: 225 * units.deg,
+			gamma: 0.2,
+			lift: 425 * units.thou,
+			steps: 100
+		);
+}
+
+public node w3_camshaft_builder {
+	input lobe_profile: w3_cam_lobe_profile();
+	input intake_lobe_profile: lobe_profile;
+	input exhaust_lobe_profile: lobe_profile;
+	input lobe_seperation: 110.0 * units.deg;
+	input intake_lobe_center: lobe_seperation;
+	input exhaust_lobe_center: lobe_seperation;
+	input advance: 0 * units.deg;
+	input base_radius: 0.5 * units.inch;
+
+	output intake_cam_0: _intake_cam_0;
+	output exhaust_cam_0: _exhaust_cam_0;
+	output intake_cam_1: _intake_cam_1;
+	output exhaust_cam_1: _exhaust_cam_1;
+	output intake_cam_2: _intake_cam_2;
+	output exhaust_cam_2: _exhaust_cam_2;
+	
+	camshaft_parameters params(
+		advance: advance,
+		base_radius: base_radius
+	)
+
+	camshaft _intake_cam_0(params, lobe_profile: intake_lobe_profile)
+	camshaft _exhaust_cam_0(params, lobe_profile: exhaust_lobe_profile)
+	camshaft _intake_cam_1(params, lobe_profile: intake_lobe_profile)
+	camshaft _exhaust_cam_1(params, lobe_profile: exhaust_lobe_profile)
+	camshaft _intake_cam_2(params, lobe_profile: intake_lobe_profile)
+	camshaft _exhaust_cam_2(params, lobe_profile: exhaust_lobe_profile)
+
+	label rot15(15 * units.deg)
+	label rot360(360 * units.deg)
+
+	_exhaust_cam_0
+		.add_lobe(rot360 - exhaust_lobe_center + (450 * units.deg))
+
+	_intake_cam_0
+		.add_lobe(rot360 + intake_lobe_center  + (450 * units.deg))
+
+	_exhaust_cam_1
+		.add_lobe(rot360 - exhaust_lobe_center + (0 * units.deg))
+
+	_intake_cam_1
+		.add_lobe(rot360 + intake_lobe_center + (0 * units.deg))
+
+	_exhaust_cam_2
+		.add_lobe(rot360 - exhaust_lobe_center + (300 * units.deg))
+
+	_intake_cam_2
+		.add_lobe(rot360 + intake_lobe_center + (300 * units.deg))
+
+}
+
+public node w3 {
+	alias output __out: engine;
+
+	wires wires()
+
+	engine engine(
+		name: "W3",
+		starter_torque: 250 * units.lb_ft,
+		redline: 8000 * units.rpm,
+		fuel: fuel(
+			max_turbulence_effect: 0,
+			burning_efficiency_randomness: 0,
+			max_burning_efficiency: 1)
+	)
+
+	crankshaft c0(
+		throw: 50 * units.mm,
+		flywheel_mass: 10 * units.lb,
+		mass: 15 * units.lb,
+		friction_torque: 0.1 * units.lb_ft,
+		moment_of_inertia: 0.22986844776863666 * 0.9,
+		position_x: 0.0,
+		position_y: 0.0,
+		tdc: constants.pi / 2
+	)
+
+	rod_journal rj0(angle: (0.0 / 5.0) * 360 * units.deg)
+	c0
+
+		.add_rod_journal(rj0)
+
+	piston_parameters piston_params(
+		mass: 100 * units.g,
+		blowby: 0,
+		compression_height: 26 * units.mm,
+		wrist_pin_position: 0 * units.mm,
+		displacement: 0.0
+	)
+
+	connecting_rod_parameters cr_params(
+		mass: 150 * units.g,
+		moment_of_inertia: 0.0015884918028487504,
+		center_of_mass: 0.0,
+		length: 175 * units.mm
+	)
+
+	cylinder_bank_parameters bank_params(
+		bore: 100 * units.mm,
+		deck_height: 250 * units.mm
+	)
+
+	intake intake(
+		plenum_volume: 2.5 * units.L,
+		plenum_cross_section_area: 5.0 * units.cm2,
+		intake_flow_rate: k_carb(2500.0),
+		idle_flow_rate: k_carb(0.0),
+		idle_throttle_plate_position: 0.999,
+		throttle_gamma: 1.0
+	)
+
+	exhaust_system_parameters es_params(
+		outlet_flow_rate: k_carb(1000.0),
+		primary_tube_length: 12.0 * units.inch,
+		primary_flow_rate: k_carb(750.0),
+		velocity_decay: 0.1,
+		volume: 5 * units.L
+	)
+
+	impulse_response ir0(filename: "../../sound-library/smooth/smooth_11.wav", volume: 0.01)
+	impulse_response ir1(filename: "../../sound-library/smooth/smooth_39.wav", volume: 0.01)
+	impulse_response ir2(filename: "../../sound-library/smooth/smooth_34.wav", volume: 0.01)
+
+	exhaust_system exhaust0(es_params, audio_volume: 10.0, impulse_response: ir0)
+	exhaust_system exhaust1(es_params, audio_volume: 10.0, impulse_response: ir1)
+	exhaust_system exhaust2(es_params, audio_volume: 10.0, impulse_response: ir2)
+
+	cylinder_bank b0(bank_params, angle:-45)
+	b0
+		.add_cylinder(
+			piston: piston(piston_params, blowby: k_28inH2O(0.2)),
+			connecting_rod: connecting_rod(cr_params),
+			rod_journal: rj0,
+			intake: intake,
+			exhaust_system: exhaust0,
+			ignition_wire: wires.wire1
+		)
+
+	cylinder_bank b1(bank_params, angle:0)
+	b1
+		.add_cylinder(
+			piston: piston(piston_params, blowby: k_28inH2O(0.2)),
+			connecting_rod: connecting_rod(cr_params),
+			rod_journal: rj0,
+			intake: intake,
+			exhaust_system: exhaust1,
+			ignition_wire: wires.wire2
+		)
+
+	cylinder_bank b2(bank_params, angle:45)
+	b2
+		.add_cylinder(
+			piston: piston(piston_params, blowby: k_28inH2O(0.2)),
+			connecting_rod: connecting_rod(cr_params),
+			rod_journal: rj0,
+			intake: intake,
+			exhaust_system: exhaust2,
+			ignition_wire: wires.wire3
+		)
+
+	engine
+		.add_cylinder_bank(b0)
+		.add_cylinder_bank(b1)
+		.add_cylinder_bank(b2)
+
+	engine.add_crankshaft(c0)
+
+	w3_camshaft_builder camshaft()
+
+	b0.set_cylinder_head (
+		generic_small_engine_head(
+			chamber_volume: 50 * units.cc,
+			intake_camshaft: camshaft.intake_cam_0,
+			exhaust_camshaft: camshaft.exhaust_cam_0
+		)
+	)
+
+	b1.set_cylinder_head (
+		generic_small_engine_head(
+			chamber_volume: 50 * units.cc,
+			intake_camshaft: camshaft.intake_cam_1,
+			exhaust_camshaft: camshaft.exhaust_cam_1
+		)
+	)
+
+	b2.set_cylinder_head (
+		generic_small_engine_head(
+			chamber_volume: 50 * units.cc,
+			intake_camshaft: camshaft.intake_cam_2,
+			exhaust_camshaft: camshaft.exhaust_cam_2
+		)
+	)
+
+	function timing_curve(1000 * units.rpm)
+	timing_curve
+		.add_sample(0000 * units.rpm, 2 * units.deg)
+		.add_sample(1000 * units.rpm, 6 * units.deg)
+		.add_sample(2000 * units.rpm, 10 * units.deg)
+		.add_sample(3000 * units.rpm, 14 * units.deg)
+		.add_sample(4000 * units.rpm, 18 * units.deg)
+		.add_sample(5000 * units.rpm, 20 * units.deg)
+		.add_sample(6000 * units.rpm, 22 * units.deg)
+		.add_sample(7000 * units.rpm, 24 * units.deg)
+		.add_sample(8000 * units.rpm, 26 * units.deg)
+		.add_sample(9000 * units.rpm, 28 * units.deg)
+
+	engine.add_ignition_module(
+		w3ignition(
+			wires: wires,
+			timing_curve: timing_curve,
+			rev_limit: 8000 * units.rpm
+		)
+	)
+}

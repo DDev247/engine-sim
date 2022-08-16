@@ -41,17 +41,18 @@ class IgnitionModule : public Part {
 
         bool m_enabled;
 
+        double m_revLimit;
+        double m_revLimitTimer;
+        Function* m_timingCurve;
+
     protected:
         SparkPlug *getPlug(int i);
 
-        Function *m_timingCurve;
         SparkPlug *m_plugs;
         Crankshaft *m_crankshaft;
         int m_cylinderCount;
 
         double m_lastCrankshaftAngle;
-        double m_revLimit;
-        double m_revLimitTimer;
         double m_limiterDuration;
 };
 

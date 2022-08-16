@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 
 option(DTV "Enable video output" OFF)
+<<<<<<< Updated upstream
 option(PIRANHA_ENABLED "Enable scripting input" OFF)
 option(DISCORD_ENABLED "Enable Discord Rich Presence" ON)
+=======
+option(PIRANHA_ENABLED "Enable scripting input" ON)
+>>>>>>> Stashed changes
 
 if (DTV)
     add_compile_definitions(ATG_ENGINE_SIM_VIDEO_CAPTURE)
@@ -41,6 +45,28 @@ set_property(TARGET gmock PROPERTY FOLDER "gtest")
 set_property(TARGET gmock_main PROPERTY FOLDER "gtest")
 set_property(TARGET gtest PROPERTY FOLDER "gtest")
 set_property(TARGET gtest_main PROPERTY FOLDER "gtest")
+
+set(SDL2_INCLUDE_DIR C:/local/SDL2/include)
+set(SDL2_LIBRARY C:/local/SDL2/lib/x64/SDL2.lib)
+set(SDL2_DIR C:/local/SDL2)
+set(SDL2MAIN_LIBRARY C:/local/SDL2/lib/x64/SDL2main.lib)
+
+set(SDL2_IMAGE_INCLUDE_DIR C:/local/SDL2_image/include)
+set(SDL2_IMAGE_LIBRARY C:/local/SDL2_image/lib/x64/SDL2_image.lib)
+
+set(Boost_DIR C:/local/Boost_1_80_0)
+set(Boost_INCLUDE_DIR C:/local/Boost_1_80_0)
+set(Boost_FILESYSTEM_LIBRARY_RELEASE C:/local/Boost_1_80_0/lib64-msvc-14.3/libboost_filesystem-vc143-mt-x64-1_80.lib)
+set(Boost_FILESYSTEM_LIBRARY_DEBUG C:/local/Boost_1_80_0/lib64-msvc-14.3/libboost_filesystem-vc143-mt-gd-x64-1_80.lib)
+set(Boost_LIBRARY_DIR_DEBUG C:/local/Boost_1_80_0/lib64-msvc-14.3)
+set(Boost_LIBRARY_DIR_RELEASE C:/local/Boost_1_80_0/lib64-msvc-14.3)
+
+set(FLEX_EXECUTABLE C:/local/WinFlexBison/win_flex.exe)
+set(BISON_EXECUTABLE C:/local/WinFlexBison/win_bison.exe)
+
+include_directories(${Boost_INCLUDE_DIR})
+include_directories(${SDL2_INCLUDE_DIR})
+include_directories(${SDL2_IMAGE_INCLUDE_DIR})
 
 # ========================================================
 

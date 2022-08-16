@@ -10,6 +10,8 @@
 #include "starter_motor.h"
 #include "derivative_filter.h"
 #include "vehicle_drag_constraint.h"
+#include "../build/procharger.h"
+#include "../build/turbocharger.h"
 
 #include "scs.h"
 
@@ -123,6 +125,11 @@ class Simulator {
         double *m_exhaustFlowStagingBuffer;
         double m_filteredEngineSpeed;
         double m_dynoTorque;
+
+    public:
+        bool antilagOn;
+        ProCharger m_procharger;
+        TurboCharger m_turbocharger;
 };
 
 #endif /* ATG_ENGINE_SIM_SIMULATOR_H */

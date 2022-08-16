@@ -73,6 +73,9 @@ class Intake : public Part {
         double m_velocityDecay;
 
         GasSystem m_atmosphere;
+
+    public:
+        double addPress;
 };
 
 #endif /* ATG_ENGINE_SIM_INTAKE_H */

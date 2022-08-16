@@ -1,5 +1,6 @@
 import "engine_sim.mr"
 import "engines/kohler/kohler_ch750.mr"
+import "engines/custom/w3singlejournal.mr"
 
 set_engine(
     engine: kohler_ch750()

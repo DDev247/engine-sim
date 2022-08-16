@@ -33,6 +33,7 @@ Simulator::Simulator() {
     m_dynoTorque = 0.0;
 
     m_derivativeFilter.m_dt = 1.0;
+
 }
 
 Simulator::~Simulator() {
@@ -42,6 +43,7 @@ Simulator::~Simulator() {
     assert(m_crankshaftFrictionConstraints == nullptr);
     assert(m_system == nullptr);
     assert(m_exhaustFlowStagingBuffer == nullptr);
+    assert(m_turbo == nullptr);
 }
 
 void Simulator::initialize(const Parameters &params) {
@@ -309,6 +311,11 @@ double Simulator::getSynthesizerInputLatencyTarget() const {
     return m_targetSynthesizerLatency;
 }
 
+int iter = 0;
+bool set = false;
+double revLimit;
+double revTimer;
+
 bool Simulator::simulateStep() {
     if (m_currentIteration >= i_steps) {
         auto s1 = std::chrono::steady_clock::now();
@@ -354,19 +361,92 @@ bool Simulator::simulateStep() {
     const int exhaustSystemCount = m_engine->getExhaustSystemCount();
     const int intakeCount = m_engine->getIntakeCount();
     const double fluidTimestep = timestep / m_fluidSimulationSteps;
+
+    const bool procharger = false;
+
     for (int i = 0; i < m_fluidSimulationSteps; ++i) {
         for (int j = 0; j < exhaustSystemCount; ++j) {
             m_engine->getExhaustSystem(j)->process(fluidTimestep);
+
+            // CHANGES HERE
+            if(procharger)
+                m_procharger.AddWhoosh(m_engine->getRpm());
+            else
+                m_turbocharger.AddWhoosh(m_engine->getExhaustSystem(j)->getFlow());
         }
 
         for (int j = 0; j < intakeCount; ++j) {
             m_engine->getIntake(j)->process(fluidTimestep);
             m_engine->getIntake(j)->m_flowRate += m_engine->getIntake(j)->m_flow;
+
+            // CHANGES HERE
+            double powah;
+            double press;
+
+            if (procharger)
+            {
+                // PROCHARGER
+                powah = m_procharger.AddMoPowahBaby();
+                press = m_procharger.AddPress();
+            }
+            else
+            {
+                // TURBOCHARGER
+                powah = m_turbocharger.AddMoPowahBaby();
+                press = m_turbocharger.AddPress();
+            }
+
+            m_engine->getIntake(j)->m_flowRate += powah;
+            m_engine->getIntake(j)->addPress = press;
         }
 
         for (int j = 0; j < cylinderCount; ++j) {
             m_engine->getChamber(j)->flow(fluidTimestep);
         }
+    }
+
+    if (iter == 100)
+    {
+        if(procharger)
+            m_procharger.CurrentWhoosh();
+        else
+            m_turbocharger.Log();
+
+        iter = 0;
+    }
+    iter += 1;
+    
+    
+    if (!set) {
+        revLimit = m_engine->getIgnitionModule()->m_revLimit;
+        revTimer = m_engine->getIgnitionModule()->m_revLimitTimer;
+
+        set = true;
+    }
+    
+
+    if (antilagOn)
+    {
+        if (!procharger)
+        {
+            if (m_turbocharger.spool < 2)
+            {
+                m_turbocharger.spool += m_turbocharger.antilagBoost;
+                // retard the timing cuz why not
+                m_engine->getIgnitionModule()->m_revLimit = m_engine->getRpm();
+                m_engine->getIgnitionModule()->m_revLimitTimer = 0.25;
+            }
+            else
+            {
+                m_engine->getIgnitionModule()->m_revLimit = revLimit;
+                m_engine->getIgnitionModule()->m_revLimitTimer = revTimer;
+            }
+        }            
+    }
+    else
+    {
+        m_engine->getIgnitionModule()->m_revLimit = revLimit;
+        m_engine->getIgnitionModule()->m_revLimitTimer = revTimer;
     }
 
     im->resetIgnitionEvents();

@@ -279,6 +279,9 @@ void EngineSimApplication::initialize() {
 
 }
 
+int messageStage = 0;
+bool isPSI = false;
+
 void EngineSimApplication::process(float frame_dt) {
     frame_dt = clamp(frame_dt, 1 / 200.0f, 1 / 30.0f);
 
@@ -297,6 +300,104 @@ void EngineSimApplication::process(float frame_dt) {
     }
     else if (m_engine.IsKeyDown(ysKey::Code::N5)) {
         speed = 1 / 1000.0;
+    }
+
+    if (m_engine.ProcessKeyDown(ysKey::Code::K)) {
+        m_simulator.m_turbocharger.IS_ENABLED = !m_simulator.m_turbocharger.IS_ENABLED;
+
+        if(m_simulator.m_turbocharger.IS_ENABLED == false && messageStage != 3)
+            m_infoCluster->setLogMessage("Turbo OFF");
+    }
+
+    if (m_engine.ProcessKeyDown(ysKey::Code::P)) {
+        if (m_simulator.m_turbocharger.IS_ENABLED == false && messageStage != 3)
+        {
+            isPSI = !isPSI;
+
+            if(isPSI)
+                m_infoCluster->setLogMessage("Boost Units: PSI");
+            else
+                m_infoCluster->setLogMessage("Boost Units: Bar");
+        }
+    }
+
+    if(m_engine.ProcessKeyDown(ysKey::Code::J)) {
+        if (messageStage < 3)
+            messageStage++;
+        else
+            messageStage = 0;
+
+        if(messageStage == 0)
+            m_infoCluster->setLogMessage("Turbo Messages ON, Antilag Messages ON");
+        else if(messageStage == 1)
+            m_infoCluster->setLogMessage("Antilag Messages OFF");
+        else if(messageStage == 2)
+            m_infoCluster->setLogMessage("Boost Messages OFF");
+        else
+            m_infoCluster->setLogMessage("All Turbo Messages OFF");
+    }
+
+    // antilag / boost display
+    if (m_engine.IsKeyDown(ysKey::Code::L)) {
+        m_simulator.antilagOn = true;
+
+        if (m_simulator.m_turbocharger.IS_ENABLED && messageStage == 0)
+        {
+            if (isPSI)
+            {
+                std::string str = std::to_string(units::convert(m_simulator.m_turbocharger.AddPress(), units::atm, units::psi));
+                m_infoCluster->setLogMessage("Antilag ON Boost: " + str + " PSI");
+            }
+            else
+            {
+                std::string str = std::to_string(m_simulator.m_turbocharger.AddPress() * 1.01325);
+                m_infoCluster->setLogMessage("Antilag ON Boost: " + str + " Bar");
+            }
+        }
+        else if (m_simulator.m_turbocharger.IS_ENABLED && messageStage == 1)
+        {
+            if (isPSI)
+            {
+                std::string str = std::to_string(units::convert(m_simulator.m_turbocharger.AddPress(), units::atm, units::psi));
+                m_infoCluster->setLogMessage("Boost: " + str + " PSI");
+            }
+            else
+            {
+                std::string str = std::to_string(m_simulator.m_turbocharger.AddPress() * 1.01325);
+                m_infoCluster->setLogMessage("Boost: " + str + " Bar");
+            }
+        }
+    }
+    else
+    {
+        m_simulator.antilagOn = false;
+
+        if (m_simulator.m_turbocharger.IS_ENABLED && messageStage == 0)
+        {
+            if (isPSI)
+            {
+                std::string str = std::to_string(units::convert(m_simulator.m_turbocharger.AddPress(), units::atm, units::psi));
+                m_infoCluster->setLogMessage("Antilag OFF Boost: " + str + " PSI");
+            }
+            else
+            {
+                std::string str = std::to_string(m_simulator.m_turbocharger.AddPress() * 1.01325);
+                m_infoCluster->setLogMessage("Antilag OFF Boost: " + str + " Bar");
+            }
+        }
+        else if (m_simulator.m_turbocharger.IS_ENABLED && messageStage == 1)
+        {
+            if (isPSI)
+            {
+                std::string str = std::to_string(units::convert(m_simulator.m_turbocharger.AddPress(), units::atm, units::psi));
+                m_infoCluster->setLogMessage("Boost: " + str + " PSI");
+            }
+            else
+            {
+                std::string str = std::to_string(m_simulator.m_turbocharger.AddPress() * 1.01325);
+                m_infoCluster->setLogMessage("Boost: " + str + " Bar");
+            }
+        }
     }
 
     m_simulator.setSimulationSpeed(speed);
@@ -526,6 +627,18 @@ void EngineSimApplication::run() {
             m_dynoSpeed = clamp(m_dynoSpeed, units::rpm(0), DBL_MAX);
 
             m_infoCluster->setLogMessage("[G] - Set dyno speed to " + std::to_string(m_dynoSpeed));
+            fineControlInUse = true;
+        }
+        else if (m_engine.IsKeyDown(ysKey::Code::N0))
+        {
+            const double rate = fineControlMode
+                ? 0.05
+                : 0.1;
+
+            const double newVal = clamp(m_simulator.m_turbocharger.wastegateTrigger + mouseWheelDelta * rate * dt, 0.1, 150);
+            m_simulator.m_turbocharger.wastegateTrigger = newVal;
+
+            m_infoCluster->setLogMessage("[0] - Set wastegate to " + std::to_string(m_simulator.m_turbocharger.wastegateTrigger));
             fineControlInUse = true;
         }
 
