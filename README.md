@@ -1,4 +1,5 @@
 # Engine Simulator - Turbo mod and other enhancements
+## Please read below the controls! The turbo is controlled by controls
 ![Alt text](docs/public/screenshot_v01.png?raw=true)
 ---
 ## **Warning: project is in development and will change frequently**
