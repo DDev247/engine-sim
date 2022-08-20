@@ -42,11 +42,12 @@ class IgnitionModule : public Part {
         bool m_enabled;
 
         double m_revLimit;
-        double m_revLimitTimer;
         Function* m_timingCurve;
 
         bool retardTiming = false;
         double m_limiterDuration;
+
+        double m_revLimitTimer;
 
     protected:
         SparkPlug *getPlug(int i);
