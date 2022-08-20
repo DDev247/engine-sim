@@ -36,6 +36,8 @@ public:
 	
 	double throttle = 0.0;
 
+	bool play = false;
+
 	// default config
 	/*
 

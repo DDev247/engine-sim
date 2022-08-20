@@ -26,7 +26,7 @@
 #include "../discord/Discord.h"
 #endif
 
-std::string EngineSimApplication::s_buildVersion = "0.1.7a_turboDDev";
+std::string EngineSimApplication::s_buildVersion = "0.1.7a_turboDDev2";
 
 
 EngineSimApplication::EngineSimApplication() {
@@ -42,17 +42,33 @@ EngineSimApplication::EngineSimApplication() {
         m_screenResolution[i][0] = m_screenResolution[i][1] = 0;
     }
 
+    //m_background = ysColor::srgbiToLinear(0x0E1012);
+    //m_foreground = ysColor::srgbiToLinear(0xFFFFFF);
+    //m_shadow = ysColor::srgbiToLinear(0x0E1012);
+    //m_highlight1 = ysColor::srgbiToLinear(0xEF4545);
+    //m_highlight2 = ysColor::srgbiToLinear(0xFFFFFF);
+    //m_pink = ysColor::srgbiToLinear(0xF394BE);
+    //m_red = ysColor::srgbiToLinear(0xEE4445);
+    //m_orange = ysColor::srgbiToLinear(0xF4802A);
+    //m_yellow = ysColor::srgbiToLinear(0xFDBD2E);
+    //m_blue = ysColor::srgbiToLinear(0x77CEE0);
+    //m_green = ysColor::srgbiToLinear(0xBDD869);
+
     m_background = ysColor::srgbiToLinear(0x0E1012);
     m_foreground = ysColor::srgbiToLinear(0xFFFFFF);
     m_shadow = ysColor::srgbiToLinear(0x0E1012);
+
     m_highlight1 = ysColor::srgbiToLinear(0xEF4545);
     m_highlight2 = ysColor::srgbiToLinear(0xFFFFFF);
+
     m_pink = ysColor::srgbiToLinear(0xF394BE);
-    m_red = ysColor::srgbiToLinear(0xEE4445);
-    m_orange = ysColor::srgbiToLinear(0xF4802A);
-    m_yellow = ysColor::srgbiToLinear(0xFDBD2E);
-    m_blue = ysColor::srgbiToLinear(0x77CEE0);
-    m_green = ysColor::srgbiToLinear(0xBDD869);
+    m_red = ysColor::srgbiToLinear(245, 10, 10, 255);
+    m_orange = ysColor::srgbiToLinear(237, 108, 28, 255);
+    m_yellow = ysColor::srgbiToLinear(237, 192, 28, 255);
+    m_blue = ysColor::srgbiToLinear(20, 131, 227);
+    m_green = ysColor::srgbiToLinear(20, 227, 68);
+    //ysColor::srgbiToLinear(255)
+
 
     m_displayHeight = (float)units::distance(2.0, units::foot);
     m_outputAudioBuffer = nullptr;

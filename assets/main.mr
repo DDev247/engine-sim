@@ -1,8 +1,11 @@
 import "engine_sim.mr"
 import "engines/kohler/kohler_ch750.mr"
 import "engines/chevrolet/chev_truck_454.mr"
-import "engines/custom/lawnmower.mr"
+import "engines/custom/4.0_i6.mr"
+import "engines/custom/sr20de.mr"
+import "engines/custom/2RZ-EF.mr"
+import "engines/audi/i5.mr"
 
 set_engine(
-    engine: kohler_ch750()
+    engine: audi_i5_2_2L()
 )

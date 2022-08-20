@@ -42,6 +42,7 @@ void AfrCluster::initialize(EngineSimApplication *app) {
     m_intakeAfrGauge->m_gauge->m_needleKd = 20.0f;
     m_intakeAfrGauge->m_gauge->setBandCount(0);
 
+    
     m_exhaustAfrGauge->m_title = "EX. O2";
     m_exhaustAfrGauge->m_unit = "";
     m_exhaustAfrGauge->m_precision = 1;
@@ -58,6 +59,8 @@ void AfrCluster::initialize(EngineSimApplication *app) {
     m_exhaustAfrGauge->m_gauge->m_needleKs = 1000.0f;
     m_exhaustAfrGauge->m_gauge->m_needleKd = 20.0f;
     m_exhaustAfrGauge->m_gauge->setBandCount(0);
+    
+    
 }
 
 void AfrCluster::destroy() {

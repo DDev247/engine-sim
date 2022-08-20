@@ -46,6 +46,9 @@ double TurboCharger::AddPress()
 	}
 }
 
+double lastThrottle = 0;
+bool played = false;
+
 void TurboCharger::AddWhoosh(double exhaust)
 {
 	if (this->IS_ENABLED)
@@ -74,10 +77,20 @@ void TurboCharger::AddWhoosh(double exhaust)
 
 		if (throttle == 0)
 		{
+			if (!played)
+			{
+				this->play = true;
+				played = true;
+			}
+
 			if (spool > -0.5)
 				spool -= 0.25;
 		}
-		
+		else
+		{
+			played = false;
+		}
+
 		if (spool >= this->wastegateTrigger)
 			spool = this->wastegateTrigger;
 		else if (spool < -0.5)
