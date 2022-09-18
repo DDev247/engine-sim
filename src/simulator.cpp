@@ -6,13 +6,14 @@
 #include <cmath>
 #include <assert.h>
 #include <chrono>
+#include <set>
 
 Simulator::Simulator() {
     m_engine = nullptr;
     m_transmission = nullptr;
     m_vehicle = nullptr;
 
-    i_steps = 1;
+    i_steps = 0;
     m_currentIteration = 0;
     m_simulationSpeed = 1.0;
     m_targetSynthesizerLatency = 0.1;
@@ -46,10 +47,6 @@ Simulator::~Simulator() {
 }
 
 void Simulator::initialize(const Parameters &params) {
-    if (params.Engine == nullptr) {
-        return;
-    }
-
     if (params.SystemType == SystemType::NsvOptimized) {
         atg_scs::OptimizedNsvRigidBodySystem *system =
             new atg_scs::OptimizedNsvRigidBodySystem;
@@ -65,12 +62,12 @@ void Simulator::initialize(const Parameters &params) {
             new atg_scs::NsvOdeSolver);
         m_system = system;
     }
+}
 
-    m_engine = params.Engine;
-    m_vehicle = params.Vehicle;
-    m_transmission = params.Transmission;
-    m_fluidSimulationSteps = params.FluidSimulationSteps;
-    m_simulationFrequency = params.SimulationFrequency;
+void Simulator::loadSimulation(Engine *engine, Vehicle *vehicle, Transmission *transmission) {
+    m_engine = engine;
+    m_vehicle = vehicle;
+    m_transmission = transmission;
 
     const int crankCount = m_engine->getCrankshaftCount();
     const int cylinderCount = m_engine->getCylinderCount();
@@ -93,8 +90,8 @@ void Simulator::initialize(const Parameters &params) {
 
         m_crankConstraints[i].setBody(&crankshaft->m_body);
         m_crankConstraints[i].setWorldPosition(
-                crankshaft->getPosX(),
-                crankshaft->getPosY());
+            crankshaft->getPosX(),
+            crankshaft->getPosY());
         m_crankConstraints[i].setLocalPosition(0.0, 0.0);
         m_crankConstraints[i].m_kd = kd;
         m_crankConstraints[i].m_ks = ks;
@@ -103,7 +100,7 @@ void Simulator::initialize(const Parameters &params) {
         crankshaft->m_body.p_y = crankshaft->getPosY();
         crankshaft->m_body.theta = 0;
         crankshaft->m_body.m =
-                crankshaft->getMass() + crankshaft->getFlywheelMass();
+            crankshaft->getMass() + crankshaft->getFlywheelMass();
         crankshaft->m_body.I = crankshaft->getMomentOfInertia();
 
         m_crankshaftFrictionConstraints[i].m_minTorque = -crankshaft->getFrictionTorque();
@@ -129,6 +126,7 @@ void Simulator::initialize(const Parameters &params) {
     m_vehicleDrag.initialize(&m_vehicleMass, m_vehicle);
     m_system->addConstraint(&m_vehicleDrag);
 
+    m_vehicleMass.reset();
     m_vehicleMass.m = 1.0;
     m_vehicleMass.I = 1.0;
     m_system->addRigidBody(&m_vehicleMass);
@@ -136,7 +134,6 @@ void Simulator::initialize(const Parameters &params) {
     for (int i = 0; i < cylinderCount; ++i) {
         Piston *piston = m_engine->getPiston(i);
         ConnectingRod *connectingRod = piston->getRod();
-        Crankshaft *crankshaft = connectingRod->getCrankshaft();
 
         CylinderBank *bank = piston->getCylinderBank();
         const double dx = std::cos(bank->getAngle() + constants::pi / 2);
@@ -163,13 +160,23 @@ void Simulator::initialize(const Parameters &params) {
         m_linkConstraints[i * 2 + 0].m_kd = kd;
 
         double journal_x = 0.0, journal_y = 0.0;
-        crankshaft->getRodJournalPositionLocal(
+        if (connectingRod->getMasterRod() == nullptr) {
+            Crankshaft *crankshaft = connectingRod->getCrankshaft();
+            crankshaft->getRodJournalPositionLocal(
                 connectingRod->getJournal(),
                 &journal_x,
                 &journal_y);
+            m_linkConstraints[i * 2 + 1].setBody2(&crankshaft->m_body);
+        }
+        else {
+            connectingRod->getMasterRod()->getRodJournalPositionLocal(
+                connectingRod->getJournal(),
+                &journal_x,
+                &journal_y);
+            m_linkConstraints[i * 2 + 1].setBody2(&connectingRod->getMasterRod()->m_body);
+        }
 
         m_linkConstraints[i * 2 + 1].setBody1(&connectingRod->m_body);
-        m_linkConstraints[i * 2 + 1].setBody2(&crankshaft->m_body);
         m_linkConstraints[i * 2 + 1]
             .setLocalPosition1(0.0, connectingRod->getBigEndLocal());
         m_linkConstraints[i * 2 + 1]
@@ -203,6 +210,13 @@ void Simulator::initialize(const Parameters &params) {
     initializeSynthesizer();
 }
 
+void Simulator::releaseSimulation() {
+    m_synthesizer.endAudioRenderingThread();
+    if (m_system != nullptr) m_system->reset();
+
+    destroy();
+}
+
 double Simulator::getAverageOutputSignal() const {
     double sum = 0.0;
     for (int i = 0; i < m_engine->getExhaustSystemCount(); ++i) {
@@ -216,49 +230,14 @@ void Simulator::placeAndInitialize() {
     const int cylinderCount = m_engine->getCylinderCount();
     for (int i = 0; i < cylinderCount; ++i) {
         ConnectingRod *rod = m_engine->getConnectingRod(i);
-        Piston *piston = m_engine->getPiston(i);
-        CylinderBank *bank = piston->getCylinderBank();
 
-        double p_x, p_y;
-        rod->getCrankshaft()->getRodJournalPositionLocal(rod->getJournal(), &p_x, &p_y);
+        if (rod->getRodJournalCount() != 0) {
+            placeCylinder(i);
+        }
+    }
 
-        p_x += rod->getCrankshaft()->getPosX();
-        p_y += rod->getCrankshaft()->getPosY();
-
-        // (bank->m_x + bank->m_dx * s - p_x)^2 + (bank->m_y + bank->m_dy * s - p_y)^2 = (rod->m_length)^2
-        const double a = bank->getDx() * bank->getDx() + bank->getDy() * bank->getDy();
-        const double b = -2 * bank->getDx() * (p_x - bank->getX()) - 2 * bank->getDy() * (p_y - bank->getY());
-        const double c =
-            (p_x - bank->getX()) * (p_x - bank->getX())
-            + (p_y - bank->getY()) * (p_y - bank->getY())
-            - rod->getLength() * rod->getLength();
-
-        const double det = b * b - 4 * a * c;
-        if (det < 0) continue;
-
-        const double sqrt_det = std::sqrt(det);
-        const double s0 = (-b + sqrt_det) / (2 * a);
-        const double s1 = (-b - sqrt_det) / (2 * a);
-
-        const double s = std::max(s0, s1);
-        if (s < 0) continue;
-
-        const double e_x = s * bank->getDx() + bank->getX();
-        const double e_y = s * bank->getDy() + bank->getY();
-
-        const double theta = ((e_y - p_y) > 0)
-            ? std::acos((e_x - p_x) / rod->getLength())
-            : 2 * constants::pi - std::acos((e_x - p_x) / rod->getLength());
-        rod->m_body.theta = theta - constants::pi / 2;
-
-        double cl_x, cl_y;
-        rod->m_body.localToWorld(0, rod->getBigEndLocal(), &cl_x, &cl_y);
-        rod->m_body.p_x += p_x - cl_x;
-        rod->m_body.p_y += p_y - cl_y;
-
-        piston->m_body.p_x = e_x;
-        piston->m_body.p_y = e_y;
-        piston->m_body.theta = bank->getAngle() + constants::pi;
+    for (int i = 0; i < cylinderCount; ++i) {
+        placeCylinder(i);
     }
 
     for (int i = 0; i < cylinderCount; ++i) {
@@ -273,7 +252,62 @@ void Simulator::placeAndInitialize() {
 }
 
 double tim = 0;
+
+void Simulator::placeCylinder(int i) {
+    ConnectingRod *rod = m_engine->getConnectingRod(i);
+    Piston *piston = m_engine->getPiston(i);
+    CylinderBank *bank = piston->getCylinderBank();
+
+    double p_x, p_y;
+    if (rod->getMasterRod() != nullptr) {
+        rod->getMasterRod()->getRodJournalPositionGlobal(rod->getJournal(), &p_x, &p_y);
+    }
+    else {
+        rod->getCrankshaft()->getRodJournalPositionGlobal(rod->getJournal(), &p_x, &p_y);
+    }
+
+    // (bank->m_x + bank->m_dx * s - p_x)^2 + (bank->m_y + bank->m_dy * s - p_y)^2 = (rod->m_length)^2
+    const double a = bank->getDx() * bank->getDx() + bank->getDy() * bank->getDy();
+    const double b = -2 * bank->getDx() * (p_x - bank->getX()) - 2 * bank->getDy() * (p_y - bank->getY());
+    const double c =
+        (p_x - bank->getX()) * (p_x - bank->getX())
+        + (p_y - bank->getY()) * (p_y - bank->getY())
+        - rod->getLength() * rod->getLength();
+
+    const double det = b * b - 4 * a * c;
+    if (det < 0) return;
+
+    const double sqrt_det = std::sqrt(det);
+    const double s0 = (-b + sqrt_det) / (2 * a);
+    const double s1 = (-b - sqrt_det) / (2 * a);
+
+    const double s = std::max(s0, s1);
+    if (s < 0) return;
+
+    const double e_x = s * bank->getDx() + bank->getX();
+    const double e_y = s * bank->getDy() + bank->getY();
+
+    const double theta = ((e_y - p_y) > 0)
+        ? std::acos((e_x - p_x) / rod->getLength())
+        : 2 * constants::pi - std::acos((e_x - p_x) / rod->getLength());
+    rod->m_body.theta = theta - constants::pi / 2;
+
+    double cl_x, cl_y;
+    rod->m_body.localToWorld(0, rod->getBigEndLocal(), &cl_x, &cl_y);
+    rod->m_body.p_x += p_x - cl_x;
+    rod->m_body.p_y += p_y - cl_y;
+
+    piston->m_body.p_x = e_x;
+    piston->m_body.p_y = e_y;
+    piston->m_body.theta = bank->getAngle() + constants::pi;
+}
+
 void Simulator::startFrame(double dt) {
+    if (m_engine == nullptr) {
+        i_steps = 0;
+        return;
+    }
+
     m_simulationStart = std::chrono::steady_clock::now();
     m_currentIteration = 0;
     m_synthesizer.setInputSampleRate(m_simulationFrequency * m_simulationSpeed);
@@ -337,6 +371,7 @@ bool Simulator::simulateStep() {
 
     m_dynoTorque = 0.99 * m_dynoTorque + 0.01 * m_dyno.getTorque();
 
+    m_engine->update(timestep);
     m_vehicle->update(timestep);
     m_transmission->update(timestep);
 
@@ -512,6 +547,10 @@ int Simulator::readAudioOutput(int samples, int16_t *target) {
 }
 
 void Simulator::endFrame() {
+    if (m_engine == nullptr) {
+        return;
+    }
+
     const double frameTimestep = i_steps * getTimestep();
     const int cylinderCount = m_engine->getCylinderCount();
     for (int i = 0; i < m_engine->getIntakeCount(); ++i) {
@@ -522,12 +561,14 @@ void Simulator::endFrame() {
 }
 
 void Simulator::destroy() {
-    delete[] m_crankConstraints;
-    delete[] m_cylinderWallConstraints;
-    delete[] m_linkConstraints;
-    delete[] m_crankshaftFrictionConstraints;
-    delete[] m_exhaustFlowStagingBuffer;
-    delete m_system;
+    if (m_system != nullptr) m_system->reset();
+
+    if (m_crankConstraints != nullptr) delete[] m_crankConstraints;
+    if (m_cylinderWallConstraints != nullptr) delete[] m_cylinderWallConstraints;
+    if (m_linkConstraints != nullptr) delete[] m_linkConstraints;
+    if (m_crankshaftFrictionConstraints != nullptr) delete[] m_crankshaftFrictionConstraints;
+    if (m_exhaustFlowStagingBuffer != nullptr) delete[] m_exhaustFlowStagingBuffer;
+    if (m_system != nullptr) delete m_system;
 
     m_crankConstraints = nullptr;
     m_cylinderWallConstraints = nullptr;
@@ -536,6 +577,8 @@ void Simulator::destroy() {
     m_exhaustFlowStagingBuffer = nullptr;
     m_system = nullptr;
 
+    m_vehicle = nullptr;
+    m_transmission = nullptr;
     m_engine = nullptr;
 
     m_synthesizer.destroy();
@@ -570,15 +613,6 @@ void Simulator::writeToSynthesizer(double other) {
     const double attenuation = min(std::abs(m_filteredEngineSpeed), 40.0) / 40.0;
     const double attenuation_3 = attenuation * attenuation * attenuation;
 
-    for (int i = 0; i < exhaustSystemCount; ++i) {
-        ExhaustSystem *exhaustSystem = m_engine->getExhaustSystem(i);
-        m_exhaustFlowStagingBuffer[i] +=
-            attenuation_3 * 0 * (
-                1.0 * (exhaustSystem->getSystem()->pressure() - units::pressure(1.0, units::atm))
-                + 0.1 * exhaustSystem->getSystem()->dynamicPressure(1.0, 0.0)
-                + 0.1 * exhaustSystem->getSystem()->dynamicPressure(-1.0, 0.0));
-    }
-
     const double timestep = getTimestep();
     const int cylinderCount = m_engine->getCylinderCount();
     for (int i = 0; i < cylinderCount; ++i) {
@@ -594,7 +628,8 @@ void Simulator::writeToSynthesizer(double other) {
 
         ExhaustSystem *exhaustSystem = head->getExhaustSystem(piston->getCylinderIndex());
         m_exhaustFlowStagingBuffer[exhaustSystem->getIndex()] +=
-            exhaustSystem->getAudioVolume() * exhaustFlow / cylinderCount;
+            head->getSoundAttenuation(piston->getCylinderIndex()) 
+            * exhaustSystem->getAudioVolume() * exhaustFlow / cylinderCount;
     }
 
     m_exhaustFlowStagingBuffer = &other;

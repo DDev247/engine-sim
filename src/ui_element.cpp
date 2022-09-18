@@ -27,7 +27,12 @@ void UiElement::initialize(EngineSimApplication *app) {
 }
 
 void UiElement::destroy() {
-    /* void */
+    for (UiElement *child : m_children) {
+        child->destroy();
+        delete child;
+    }
+
+    m_children.clear();
 }
 
 void UiElement::update(float dt) {
@@ -232,6 +237,26 @@ void UiElement::drawFrame(
 
     m_app->getShaders()->SetBaseColor(frameColor);
     m_app->drawGenerated(frame, 0x11, m_app->getShaders()->GetUiFlags());
+}
+
+void UiElement::drawBox(const Bounds &bounds, const ysVector &fillColor) {
+    GeometryGenerator *generator = m_app->getGeometryGenerator();
+    const Bounds worldBounds = getRenderBounds(bounds);
+
+    GeometryGenerator::Line2dParameters lineParams;
+    lineParams.lineWidth = worldBounds.height();
+    lineParams.y0 = lineParams.y1 = worldBounds.getPosition(Bounds::center).y;
+    lineParams.x0 = worldBounds.left();
+    lineParams.x1 = worldBounds.right();
+
+    GeometryGenerator::GeometryIndices body;
+    generator->startShape();
+    generator->generateLine2d(lineParams);
+    generator->endShape(&body);
+
+    resetShader();
+    m_app->getShaders()->SetBaseColor(fillColor);
+    m_app->drawGenerated(body, 0x11, m_app->getShaders()->GetUiFlags());
 }
 
 void UiElement::drawText(

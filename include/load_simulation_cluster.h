@@ -16,14 +16,19 @@ class LoadSimulationCluster : public UiElement {
 
         virtual void update(float dt);
         virtual void render();
+        void setUnits();
 
         void setSimulator(Simulator *simulator) { m_simulator = simulator; }
+
+    private:
+        Transmission *getTransmission() const { return m_simulator->getTransmission(); }
 
     protected:
         void drawCurrentGear(const Bounds &bounds);
         void drawClutchPressureGauge(const Bounds &bounds);
         void drawSystemStatus(const Bounds &bounds);
         void updateHpAndTorque(float dt);
+        bool isIgnitionOn() const;
 
         float m_systemStatusLights[4];
         LabeledGauge *m_dynoSpeedGauge;
@@ -38,6 +43,9 @@ class LoadSimulationCluster : public UiElement {
         double m_peakHorsepower;
         double m_peakTorqueRpm;
         double m_peakTorque;
+        
+        std::string m_powerUnits;
+        std::string m_torqueUnits;
 
         Simulator *m_simulator;
 };

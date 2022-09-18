@@ -66,7 +66,7 @@ void LoadSimulationCluster::initialize(EngineSimApplication *app) {
     m_torqueGauge->m_gauge->setBandCount(0);
 
     m_hpGauge = addElement<LabeledGauge>();
-    m_hpGauge->m_title = "HORSEPOWER";
+    m_hpGauge->m_title = "POWER";
     m_hpGauge->m_unit = "HP";
     m_hpGauge->m_precision = 0;
     m_hpGauge->setLocalPosition({ 0, 0 });
@@ -102,6 +102,10 @@ void LoadSimulationCluster::initialize(EngineSimApplication *app) {
     m_clutchPressureGauge->m_gauge->m_needleKd = 5.0f;
     m_clutchPressureGauge->m_gauge->m_needleMaxVelocity = 10.0f;
     m_clutchPressureGauge->m_gauge->setBandCount(0);
+
+    m_torqueUnits = app->getAppSettings()->torqueUnits;
+    m_powerUnits = app->getAppSettings()->powerUnits;
+    setUnits();
 }
 
 void LoadSimulationCluster::destroy() {
@@ -112,7 +116,7 @@ void LoadSimulationCluster::update(float dt) {
     UiElement::update(dt);
 
     const float systemStatuses[] = {
-        m_simulator->getEngine()->getIgnitionModule()->m_enabled ? 1.0f : 0.01f,
+        isIgnitionOn() ? 1.0f : 0.01f,
         m_simulator->m_starterMotor.m_enabled ? 1.0f : 0.01f,
         m_simulator->m_dyno.m_enabled ? 1.0f : 0.01f,
         m_simulator->m_dyno.m_hold ? (m_simulator->m_dyno.m_enabled ? 1.0f : 0.25f) : 0.01f
@@ -129,9 +133,21 @@ void LoadSimulationCluster::update(float dt) {
     if (m_app->getEngine()->ProcessKeyDown(ysKey::Code::I)) {
         std::stringstream ss;
         ss << std::setprecision(0) << std::fixed;
-        ss << m_peakHorsepower << "HP @ " << m_peakHorsepowerRpm << "rpm"
-            << " | "
-            << m_peakTorque << "lb-ft @ " << m_peakTorqueRpm << "rpm";
+        if (m_powerUnits == "hp") {
+            ss << m_peakHorsepower << "hp @ " << m_peakHorsepowerRpm << "rpm";
+        }
+        else {
+            ss << m_peakHorsepower << "kW @ " << m_peakHorsepowerRpm << "rpm";
+        }
+
+        ss << " | ";
+
+        if (m_torqueUnits == "lb-ft") {
+            ss << m_peakTorque << "lb-ft @ " << m_peakTorqueRpm << "rpm";
+        }
+        else {
+            ss << m_peakTorque << "Nm @ " << m_peakTorqueRpm << "rpm";
+        }
         m_app->getInfoCluster()->setLogMessage(ss.str());
     }
 
@@ -154,11 +170,13 @@ void LoadSimulationCluster::render() {
 
     const Bounds dynoSpeedBounds = grid.get(m_bounds, 0, 1);
     m_dynoSpeedGauge->m_gauge->m_value = 
-       (float)units::toRpm(m_simulator->m_dyno.m_rotationSpeed);
+       (float)units::toRpm(std::abs(m_simulator->m_dyno.m_rotationSpeed));
     m_dynoSpeedGauge->m_bounds = dynoSpeedBounds;
 
+    Engine *engine = m_simulator->getEngine();
+
     constexpr float shortenAngle = (float)units::angle(1.0, units::deg);
-    const double redline = units::toRpm(m_simulator->getEngine()->getRedline());
+    const double redline = units::toRpm((engine != nullptr) ? engine->getRedline() : 0);
     const double maxRpm = std::floor(redline / 500.0) * 500.0;
     m_dynoSpeedGauge->m_gauge->m_max = (int)(maxRpm);
     m_dynoSpeedGauge->m_gauge->setBandCount(1);
@@ -185,10 +203,12 @@ void LoadSimulationCluster::drawCurrentGear(const Bounds &bounds) {
     const Bounds title = insetBounds.verticalSplit(0.9f, 1.0f);
     const Bounds body = insetBounds.verticalSplit(0.0f, 0.9f);
 
-    drawFrame(bounds, 1.0f, m_app->getWhite(), m_app->getBackgroundColor());
+    drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
     drawCenteredText("Gear", title.inset(10.0f), 24.0f);
 
-    const int gear = m_simulator->getTransmission()->getGear();
+    const int gear = (getTransmission() != nullptr)
+        ? getTransmission()->getGear()
+        : -1;
     std::stringstream ss;
     
     if (gear != -1) ss << (gear + 1);
@@ -199,15 +219,16 @@ void LoadSimulationCluster::drawCurrentGear(const Bounds &bounds) {
 
 void LoadSimulationCluster::drawClutchPressureGauge(const Bounds &bounds) {
     m_clutchPressureGauge->m_bounds = bounds;
-    m_clutchPressureGauge->m_gauge->m_value =
-        (float)m_simulator->getTransmission()->getClutchPressure() * 100.0f;
+    m_clutchPressureGauge->m_gauge->m_value = (getTransmission() != nullptr)
+        ? (float)getTransmission()->getClutchPressure() * 100.0f
+        : 0.0f;
 }
 
 void LoadSimulationCluster::drawSystemStatus(const Bounds &bounds) {
     const Bounds left = bounds.horizontalSplit(0.0f, 0.6f);
     const Bounds right = bounds.horizontalSplit(0.6f, 1.0f);
 
-    drawFrame(bounds, 1.0f, m_app->getWhite(), m_app->getBackgroundColor());
+    drawFrame(bounds, 1.0f, m_app->getForegroundColor(), m_app->getBackgroundColor());
 
     Grid grid;
     grid.v_cells = 4;
@@ -242,7 +263,7 @@ void LoadSimulationCluster::drawSystemStatus(const Bounds &bounds) {
         drawFrame(
             squareBounds,
             1.0f,
-            mix(m_app->getBackgroundColor(), m_app->getWhite(), 0.001f),
+            mix(m_app->getBackgroundColor(), m_app->getForegroundColor(), 0.001f),
             mix(m_app->getBackgroundColor(), m_app->getRed(), m_systemStatusLights[i])
         );
     }
@@ -252,19 +273,71 @@ void LoadSimulationCluster::updateHpAndTorque(float dt) {
     constexpr double RC = 1.0;
     const double alpha = dt / (dt + RC);
 
-    const double torque = units::convert(m_simulator->getFilteredDynoTorque(), units::ft_lb);
-    const double hp = torque * m_simulator->getEngine()->getRpm() / 5252.0;
+    const double torque = m_simulator->getFilteredDynoTorque();
+    const double power = m_simulator->getDynoPower();
+    const double torqueWithUnits = (m_torqueUnits == "Nm")
+        ? (units::convert(torque, units::Nm))
+        : (units::convert(torque, units::ft_lb));
+    const double powerWithUnits = (m_powerUnits == "kW")
+        ? (units::convert(power, units::kW))
+        : (units::convert(power, units::hp));
 
-    m_filteredTorque = (1 - alpha) * m_filteredTorque + alpha * torque;
-    m_filteredHorsepower = (1 - alpha) * m_filteredHorsepower + alpha * hp;
+    m_filteredTorque = (1 - alpha) * m_filteredTorque + alpha * torqueWithUnits;
+    m_filteredHorsepower = (1 - alpha) * m_filteredHorsepower + alpha * powerWithUnits;
 
-    if (m_filteredTorque > m_peakTorque) {
-        m_peakTorque = m_filteredTorque;
-        m_peakTorqueRpm = m_simulator->getEngine()->getRpm();
+    if (m_simulator->getEngine() != nullptr) {
+        if (m_filteredTorque > m_peakTorque) {
+            m_peakTorque = m_filteredTorque;
+            m_peakTorqueRpm = m_simulator->getEngine()->getRpm();
+        }
+
+        if (m_filteredHorsepower > m_peakHorsepower) {
+            m_peakHorsepower = std::fmax(m_peakHorsepower, m_filteredHorsepower);
+            m_peakHorsepowerRpm = m_simulator->getEngine()->getRpm();
+        }
+    }
+}
+
+bool LoadSimulationCluster::isIgnitionOn() const {
+    Engine *engine = m_simulator->getEngine();
+    return (engine != nullptr)
+        ? engine->getIgnitionModule()->m_enabled
+        : false;
+}
+
+void LoadSimulationCluster::setUnits(){
+    if (m_torqueUnits == "lb-ft") {
+        m_torqueGauge->m_unit = "lb-ft";
+        m_torqueGauge->m_precision = 0;
+        m_torqueGauge->m_gauge->m_min = 0;
+        m_torqueGauge->m_gauge->m_max = 1000;
+        m_torqueGauge->m_gauge->m_minorStep = 50;
+        m_torqueGauge->m_gauge->m_majorStep = 100;
+    }
+    else if (m_torqueUnits == "Nm") {
+        m_torqueGauge->m_unit = "Nm";
+        m_torqueGauge->m_precision = 1;
+        m_torqueGauge->m_gauge->m_min = 0;
+        m_torqueGauge->m_gauge->m_max = 1000;
+        m_torqueGauge->m_gauge->m_minorStep = 50;
+        m_torqueGauge->m_gauge->m_majorStep = 100;
     }
 
-    if (m_filteredHorsepower > m_peakHorsepower) {
-        m_peakHorsepower = std::fmax(m_peakHorsepower, m_filteredHorsepower);
-        m_peakHorsepowerRpm = m_simulator->getEngine()->getRpm();
+    if (m_powerUnits == "hp") {
+        m_hpGauge->m_unit = "hp";
+        m_hpGauge->m_precision = 0;
+
+        m_hpGauge->m_gauge->m_min = 0;
+        m_hpGauge->m_gauge->m_max = 1000;
+        m_hpGauge->m_gauge->m_minorStep = 50;
+        m_hpGauge->m_gauge->m_majorStep = 100;
+    }
+    else if (m_powerUnits == "kW") {
+        m_hpGauge->m_unit = "kW";
+        m_hpGauge->m_precision = 1;
+        m_hpGauge->m_gauge->m_min = 0;
+        m_hpGauge->m_gauge->m_max = 1000;
+        m_hpGauge->m_gauge->m_minorStep = 50;
+        m_hpGauge->m_gauge->m_majorStep = 100;
     }
 }

@@ -1,4 +1,5 @@
 #include "..\include\engine.h"
+#include "..\include\engine.h"
 #include "../include/engine.h"
 
 #include "../include/constants.h"
@@ -29,7 +30,13 @@ Engine::Engine() {
     m_starterTorque = 0;
     m_redline = 0;
 
-    m_throttle = 0.0;
+    m_throttle = nullptr;
+    m_throttleValue = 0.0;
+
+    m_initialSimulationFrequency = 10000.0;
+    m_initialHighFrequencyGain = 0.01;
+    m_initialJitter = 0.5;
+    m_initialNoise = 1.0;
 }
 
 Engine::~Engine() {
@@ -53,6 +60,11 @@ void Engine::initialize(const Parameters &params) {
     m_starterSpeed = params.StarterSpeed;
     m_redline = params.Redline;
     m_name = params.Name;
+    m_throttle = params.throttle;
+    m_initialHighFrequencyGain = params.initialHighFrequencyGain;
+    m_initialSimulationFrequency = params.initialSimulationFrequency;
+    m_initialJitter = params.initialJitter;
+    m_initialNoise = params.initialNoise;
 
     m_crankshafts = new Crankshaft[m_crankshaftCount];
     m_cylinderBanks = new CylinderBank[m_cylinderBankCount];
@@ -93,14 +105,15 @@ void Engine::destroy() {
 
     m_ignitionModule.destroy();
 
-    delete[] m_crankshafts;
-    delete[] m_cylinderBanks;
-    delete[] m_heads;
-    delete[] m_pistons;
-    delete[] m_connectingRods;
-    delete[] m_exhaustSystems;
-    delete[] m_intakes;
-    delete[] m_combustionChambers;
+    if (m_throttle != nullptr) delete m_throttle;
+    if (m_crankshafts != nullptr) delete[] m_crankshafts;
+    if (m_cylinderBanks != nullptr) delete[] m_cylinderBanks;
+    if (m_heads != nullptr) delete[] m_heads;
+    if (m_pistons != nullptr) delete[] m_pistons;
+    if (m_connectingRods != nullptr) delete[] m_connectingRods;
+    if (m_exhaustSystems != nullptr) delete[] m_exhaustSystems;
+    if (m_intakes != nullptr) delete[] m_intakes;
+    if (m_combustionChambers != nullptr) delete[] m_combustionChambers;
 
     m_crankshafts = nullptr;
     m_cylinderBanks = nullptr;
@@ -110,10 +123,19 @@ void Engine::destroy() {
     m_exhaustSystems = nullptr;
     m_intakes = nullptr;
     m_combustionChambers = nullptr;
+    m_throttle = nullptr;
 }
 
 Crankshaft *Engine::getOutputCrankshaft() const {
     return &m_crankshafts[0];
+}
+
+void Engine::setSpeedControl(double s) {
+    m_throttle->setSpeedControl(s);
+}
+
+double Engine::getSpeedControl() {
+    return m_throttle->getSpeedControl();
 }
 
 void Engine::setThrottle(double throttle) {
@@ -121,15 +143,86 @@ void Engine::setThrottle(double throttle) {
         m_intakes[i].m_throttle = throttle;
     }
 
-    m_throttle = throttle;
+    m_throttleValue = throttle;
 }
 
 double Engine::getThrottle() const {
-    return m_throttle;
+    return m_throttleValue;
 }
 
 double Engine::getThrottlePlateAngle() const {
     return (1 - m_intakes[0].getThrottlePlatePosition()) * (constants::pi / 2);
+}
+
+bool placeRod(
+    const ConnectingRod &rod,
+    const CylinderBank &bank,
+    const Crankshaft &crankshaft,
+    double crankshaftAngle,
+    double *p_x,
+    double *p_y,
+    double *theta,
+    double *s)
+{
+    double p_x_0, p_y_0, l_x, l_y, theta_0;
+    if (rod.getMasterRod() != nullptr) {
+        double s;
+        const bool succeeded = placeRod(
+            *rod.getMasterRod(),
+            *rod.getMasterRod()->getPiston()->getCylinderBank(),
+            *rod.getCrankshaft(),
+            crankshaftAngle,
+            &p_x_0,
+            &p_y_0,
+            &theta_0,
+            &s);
+
+        if (!succeeded) {
+            return false;
+        }
+
+        rod.getMasterRod()->getRodJournalPositionLocal(rod.getPiston()->getCylinderIndex(), &l_x, &l_y);
+    }
+    else {
+        theta_0 = crankshaftAngle;
+        p_x_0 = rod.getCrankshaft()->getPosX();
+        p_y_0 = rod.getCrankshaft()->getPosY();
+        rod.getCrankshaft()->getRodJournalPositionLocal(rod.getPiston()->getCylinderIndex(), &l_x, &l_y);
+    }
+
+    const double dx = std::cos(theta_0);
+    const double dy = std::sin(theta_0);
+    *p_x = p_x_0 + (dx * l_x - dy * l_y);
+    *p_y = p_y_0 + (dy * l_x + dx * l_y);
+
+    // (bank->m_x + bank->m_dx * s - p_x)^2 + (bank->m_y + bank->m_dy * s - p_y)^2 = (rod->m_length)^2
+    const double a = bank.getDx() * bank.getDx() + bank.getDy() * bank.getDy();
+    const double b = -2 * bank.getDx() * ((*p_x) - bank.getX()) - 2 * bank.getDy() * ((*p_y) - bank.getY());
+    const double c =
+        ((*p_x) - bank.getX()) * ((*p_x) - bank.getX())
+        + ((*p_y) - bank.getY()) * ((*p_y) - bank.getY())
+        - rod.getLength() * rod.getLength();
+
+    const double det = b * b - 4 * a * c;
+    if (det < 0) return false;
+
+    const double sqrt_det = std::sqrt(det);
+    const double s0 = (-b + sqrt_det) / (2 * a);
+    const double s1 = (-b - sqrt_det) / (2 * a);
+
+    *s = std::max(s0, s1);
+    if (*s < 0) return false;
+   
+    if (s != nullptr) {
+        const double dx = (bank.getX() + bank.getDx() * (*s)) - (*p_x);
+        const double dy = (bank.getY() + bank.getDy() * (*s)) - (*p_y);
+
+        *theta = (dy > 0)
+            ? std::acos(dx)
+            : -std::acos(dx);
+    }
+
+    return true;
 }
 
 void Engine::calculateDisplacement() {
@@ -147,7 +240,7 @@ void Engine::calculateDisplacement() {
     }
 
     for (int j = 0; j < Resolution; ++j) {
-        const double theta = 2 * (j / static_cast<double>(Resolution)) * constants::pi;
+        const double crankshaftAngle = 2 * (j / static_cast<double>(Resolution)) * constants::pi;
 
         for (int i = 0; i < m_cylinderCount; ++i) {
             const Piston &piston = m_pistons[i];
@@ -155,26 +248,21 @@ void Engine::calculateDisplacement() {
             const ConnectingRod &rod = *piston.getRod();
             const Crankshaft &shaft = *rod.getCrankshaft();
 
-            const double p_x = rod.getCrankshaft()->getThrow() * std::cos(theta) + rod.getCrankshaft()->getPosX();
-            const double p_y = rod.getCrankshaft()->getThrow() * std::sin(theta) + rod.getCrankshaft()->getPosY();
-
-            // (bank->m_x + bank->m_dx * s - p_x)^2 + (bank->m_y + bank->m_dy * s - p_y)^2 = (rod->m_length)^2
-            const double a = bank.getDx() * bank.getDx() + bank.getDy() * bank.getDy();
-            const double b = -2 * bank.getDx() * (p_x - bank.getX()) - 2 * bank.getDy() * (p_y - bank.getY());
-            const double c =
-                (p_x - bank.getX()) * (p_x - bank.getX())
-                + (p_y - bank.getY()) * (p_y - bank.getY())
-                - rod.getLength() * rod.getLength();
-
-            const double det = b * b - 4 * a * c;
-            if (det < 0) continue;
-
-            const double sqrt_det = std::sqrt(det);
-            const double s0 = (-b + sqrt_det) / (2 * a);
-            const double s1 = (-b - sqrt_det) / (2 * a);
-
-            const double s = std::max(s0, s1);
-            if (s < 0) continue;
+            double p_x, p_y;
+            double theta;
+            double s;
+            if (!placeRod(
+                rod,
+                bank,
+                shaft,
+                crankshaftAngle,
+                &p_x,
+                &p_y,
+                &theta,
+                &s))
+            {
+                continue;
+            }
 
             min_s[i] = std::min(min_s[i], s);
             max_s[i] = std::max(max_s[i], s);
@@ -185,8 +273,6 @@ void Engine::calculateDisplacement() {
     for (int i = 0; i < m_cylinderCount; ++i) {
         const Piston &piston = m_pistons[i];
         const CylinderBank &bank = *piston.getCylinderBank();
-        const ConnectingRod &rod = *piston.getRod();
-        const Crankshaft &shaft = *rod.getCrankshaft();
 
         if (min_s[i] < max_s[i]) {
             const double r = bank.getBore() / 2.0;
@@ -204,6 +290,10 @@ double Engine::getIntakeFlowRate() const {
     }
 
     return airIntake;
+}
+
+void Engine::update(double dt) {
+    m_throttle->update(dt, this);
 }
 
 double Engine::getManifoldPressure() const {
@@ -289,5 +379,14 @@ int Engine::getMaxDepth() const {
 
 double Engine::getRpm() const {
     if (m_crankshaftCount == 0) return 0;
-    else return -units::toRpm(getCrankshaft(0)->m_body.v_theta);
+    else return std::abs(units::toRpm(getCrankshaft(0)->m_body.v_theta));
+}
+
+double Engine::getSpeed() const {
+    if (m_crankshaftCount == 0) return 0;
+    else return std::abs(getCrankshaft(0)->m_body.v_theta);
+}
+
+bool Engine::isSpinningCw() const {
+    return getOutputCrankshaft()->m_body.v_theta <= 0;
 }

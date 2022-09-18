@@ -117,16 +117,18 @@ Crankshaft *es_script::EngineContext::getCrankshaft(CrankshaftNode *node) const 
     else return nullptr;
 }
 
-void es_script::EngineContext::addCamshaft(
-    CamshaftNode *node,
-    Camshaft *camshaft)
+void es_script::EngineContext::addConnectingRod(
+    ConnectingRodNode *node,
+    ConnectingRod *rod)
 {
-    m_camshafts[node] = camshaft;
+    m_rods[node] = rod;
 }
 
-Camshaft *es_script::EngineContext::getCamshaft(CamshaftNode *node) const {
-    auto it = m_camshafts.find(node);
-    if (it != m_camshafts.end()) {
+ConnectingRod *es_script::EngineContext::getConnectingRod(
+    ConnectingRodNode *node) const
+{
+    auto it = m_rods.find(node);
+    if (it != m_rods.end()) {
         return it->second;
     }
     else return nullptr;

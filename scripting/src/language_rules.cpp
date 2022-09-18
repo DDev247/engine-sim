@@ -8,6 +8,11 @@
 #include "../include/cylinder_head_node.h"
 #include "../include/ignition_module_node.h"
 #include "../include/impulse_response_node.h"
+#include "../include/standard_valvetrain_node.h"
+#include "../include/vtec_valvetrain_node.h"
+#include "../include/vehicle_node.h"
+#include "../include/transmission_node.h"
+#include "../include/throttle_nodes.h"
 
 es_script::LanguageRules::LanguageRules() {
     /* void */
@@ -61,6 +66,14 @@ void es_script::LanguageRules::registerBuiltinNodeTypes() {
         "__engine_sim__fuel_channel", &es_script::ObjectChannel::FuelChannel);
     registerBuiltinType<piranha::ChannelNode>(
         "__engine_sim__impulse_response_channel", &es_script::ObjectChannel::ImpulseResponseChannel);
+    registerBuiltinType<piranha::ChannelNode>(
+        "__engine_sim__valvetrain_channel", &es_script::ObjectChannel::ValvetrainChannel);
+    registerBuiltinType<piranha::ChannelNode>(
+        "__engine_sim__vehicle_channel", &es_script::ObjectChannel::VehicleChannel);
+    registerBuiltinType<piranha::ChannelNode>(
+        "__engine_sim__transmission_channel", &es_script::ObjectChannel::TransmissionChannel);
+    registerBuiltinType<piranha::ChannelNode>(
+        "__engine_sim__throttle_channel", &es_script::ObjectChannel::ThrottleChannel);
 
     // Literals
     registerBuiltinType<piranha::DefaultLiteralFloatNode>(
@@ -118,6 +131,7 @@ void es_script::LanguageRules::registerBuiltinNodeTypes() {
     // Actions
     registerBuiltinType<SetEngineNode>("__engine_sim__set_engine");
     registerBuiltinType<AddRodJournalNode>("__engine_sim__add_rod_journal");
+    registerBuiltinType<AddSlaveJournalNode>("__engine_sim__add_slave_journal");
     registerBuiltinType<AddCrankshaftNode>("__engine_sim__add_crankshaft");
     registerBuiltinType<AddCylinderBankNode>("__engine_sim__add_cylinder_bank");
     registerBuiltinType<AddCylinderNode>("__engine_sim__add_cylinder");
@@ -128,7 +142,11 @@ void es_script::LanguageRules::registerBuiltinNodeTypes() {
     registerBuiltinType<AddIgnitionModuleNode>("__engine_sim__add_ignition_module");
     registerBuiltinType<k_28inH2ONode>("__engine_sim__k_28inH2O");
     registerBuiltinType<k_CarbNode>("__engine_sim__k_carb");
-    registerBuiltinType<GenerateHarmonicCamLobe>("__engine_sim__generate_harmonic_cam_lobe");
+    registerBuiltinType<GenerateHarmonicCamLobeNode>("__engine_sim__generate_harmonic_cam_lobe");
+    registerBuiltinType<SetApplicationSettingsNode>("__engine_sim__set_application_settings");
+    registerBuiltinType<SetVehicleNode>("__engine_sim__set_vehicle");
+    registerBuiltinType<SetTransmissionNode>("__engine_sim__set_transmission");
+    registerBuiltinType<AddGearNode>("__engine_sim__add_gear");
 
     // Objects
     registerBuiltinType<EngineNode>("__engine_sim__engine");
@@ -146,6 +164,12 @@ void es_script::LanguageRules::registerBuiltinNodeTypes() {
     registerBuiltinType<IgnitionWireNode>("__engine_sim__ignition_wire");
     registerBuiltinType<FuelNode>("__engine_sim__fuel");
     registerBuiltinType<ImpulseResponseNode>("__engine_sim__impulse_response");
+    registerBuiltinType<StandardValvetrainNode>("__engine_sim__standard_valvetrain");
+    registerBuiltinType<VtecValvetrainNode>("__engine_sim__vtec_valvetrain");
+    registerBuiltinType<VehicleNode>("__engine_sim__vehicle");
+    registerBuiltinType<TransmissionNode>("__engine_sim__transmission");
+    registerBuiltinType<DirectThrottleLinkageNode>("__engine_sim__direct_throttle_linkage");
+    registerBuiltinType<GovernorNode>("__engine_sim__governor");
 
     // String operations
     registerBuiltinType<piranha::OperationNodeSpecialized<
