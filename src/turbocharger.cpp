@@ -1,23 +1,40 @@
 
 #include "../include/turbocharger.h"
+#include "../include/engine_sim_application.h"
 #include "../include/turbo.h"
 #include "../include/logger.h"
+#include "../include/delta.h"
 
 //std::string to_string(double x);
 
 TurboCharger::TurboCharger()
 {
+	app = nullptr;
 	this->spool = 0;
 }
 
-/*
-dbasic::AudioAsset audio;
-void TurboCharger::LoadShit(EngineSimApplication* sim)
+
+dbasic::AudioAsset* audio;
+dbasic::AudioAsset* waste;
+void TurboCharger::LoadStuff(EngineSimApplication* sim)
 {
-	//ysError err = sim->getAssetManager()->LoadAudioFile("flutter.wav", "flutter");
+	ysError err = sim->getAssetManager()->LoadAudioFile("flutters.wav", "flutter");
+	//ysError err2 = sim->getAssetManager()->LoadAudioFile("wastegate.wav", "wastegate");
 	audio = sim->getAssetManager()->GetAudioAsset("flutter");
+	//waste = sim->getAssetManager()->GetAudioAsset("wastegate");
+	app = sim;
 }
-*/
+
+void TurboCharger::frame() 
+{
+	if (this->play) {
+		this->play = false;
+		app->getEngine()->PlayAudio(audio);
+		//Logger::DebugLine("PLAY");
+	}
+	
+	//app->getEngine()->PlayAudio(waste);
+}
 
 double TurboCharger::AddMoPowahBaby()
 {
@@ -78,20 +95,23 @@ void TurboCharger::AddWhoosh(double exhaust)
 		lastExh = exh;
 		lastExhaust = exhaust * 1;
 
-		if (throttle == 0)
+		if (!mthr)
 		{
 			if (!played)
 			{
-				this->play = true;
+				if (spool >= 2.5) {
+					this->play = true;
+				}
 				played = true;
 			}
 
 			count++;
 			if (count >= delay && spool >= 0) {
 				count = 0;
-				delay = rand() % 150;
+				delay = rand() % 1550;
+				delay += 10000;
 				//stu
-				this->play = true;
+				//this->play = true;
 				//Logger::DebugLine("Stu ");
 			}
 

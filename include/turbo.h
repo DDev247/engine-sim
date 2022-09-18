@@ -15,7 +15,6 @@ public:
     virtual ~Turbo();
 
     void initialize(const Parameters& params);
-    inline void setCylinderConstraint(atg_scs::LineConstraint* constraint);
     virtual void destroy();
 
     double relativeX() const;

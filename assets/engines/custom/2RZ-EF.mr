@@ -169,10 +169,14 @@ public node m52b28 {
     engine engine(
         name: "Toyota 2RZ-EF",
         starter_torque: 150 * units.lb_ft,
-        starter_speed: 500 * units.rpm,
+        starter_speed: 300 * units.rpm,
         redline: 7000 * units.rpm,
         fuel: fuel(
-            max_turbulence_effect: 4.0
+            max_turbulence_effect: 4.0/*,
+            molecular_mass: 200 * units.g,
+            energy_density: 55.5 * units.kJ / units.g,
+            density: 0.85 * units.kg / units.L,
+            molecular_afr: 29.0 / 2.0*/
         )
     )
 
@@ -223,9 +227,9 @@ public node m52b28 {
     )
 
     performer_rpm_intake intake(
-        carburetor_cfm: 700.0,
+        carburetor_cfm: 200.0,
         idle_flow_rate_cfm: 0.1,
-        idle_throttle_plate_position: 0.951, // start at 0.963, go to -> 0.97
+        idle_throttle_plate_position: 0.981, // start at 0.963, go to -> 0.97
         throttle_gamma: 2.0
     )
 

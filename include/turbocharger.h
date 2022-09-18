@@ -14,9 +14,14 @@
 
 #include "scs.h"
 
+class EngineSimApplication;
 class TurboCharger {
 public:
 	TurboCharger();
+	
+	EngineSimApplication* app;
+	void LoadStuff(EngineSimApplication* sim);
+	void frame();
 
 	//void LoadShit(EngineSimApplication* sim);
 	//EngineSimApplication* sim;

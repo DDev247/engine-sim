@@ -169,6 +169,7 @@ void EngineSimApplication::initialize(void *instance, ysContextObject::DeviceAPI
 
     m_geometryGenerator.initialize(100000, 200000);
 
+    m_simulator.m_turbocharger.LoadStuff(this);
     initialize();
 }
 
@@ -515,6 +516,7 @@ void EngineSimApplication::run() {
         }
 
         m_uiManager.update(m_engine.GetFrameLength());
+        m_simulator.m_turbocharger.frame();
 
         renderScene();
 
@@ -744,7 +746,7 @@ void EngineSimApplication::loadScript() {
     if (compiled) {
         const es_script::Compiler::Output output = compiler.execute();
         configure(output.applicationSettings);
-
+        
         engine = output.engine;
         vehicle = output.vehicle;
         transmission = output.transmission;
@@ -905,27 +907,27 @@ void EngineSimApplication::processEngineInput() {
     const double prevTargetThrottle = m_targetSpeedSetting;
     m_targetSpeedSetting = fineControlMode ? m_targetSpeedSetting : 0.0;
     if (m_engine.IsKeyDown(ysKey::Code::Q)) {
-        m_targetSpeedSetting = 0.99;
+        m_targetSpeedSetting = 0.01;
         m_simulator.throttle = true;
         m_simulator.m_turbocharger.mthr = true;
     }
     else if (m_engine.IsKeyDown(ysKey::Code::W)) {
-        m_targetSpeedSetting = 0.9;
+        m_targetSpeedSetting = 0.1;
         m_simulator.throttle = true;
         m_simulator.m_turbocharger.mthr = true;
     }
     else if (m_engine.IsKeyDown(ysKey::Code::E)) {
-        m_targetSpeedSetting = 0.8;
+        m_targetSpeedSetting = 0.2;
         m_simulator.throttle = true;
         m_simulator.m_turbocharger.mthr = true;
     }
     else if (m_engine.IsKeyDown(ysKey::Code::R)) {
-        m_targetSpeedSetting = 0.0;
+        m_targetSpeedSetting = 1.0;
         m_simulator.throttle = true;
         m_simulator.m_turbocharger.mthr = true;
     }
     else if (fineControlMode && !fineControlInUse) {
-        m_targetSpeedSetting = std::fmax(0.0, std::fmin(1.0, m_targetSpeedSetting - mouseWheelDelta * 0.0001));
+        m_targetSpeedSetting = clamp(m_targetSpeedSetting + mouseWheelDelta * 0.0001);
         m_simulator.throttle = true;
         m_simulator.m_turbocharger.mthr = true;
     }
