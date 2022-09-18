@@ -2,6 +2,7 @@
 
 #include "../include/cylinder_bank.h"
 #include "../include/engine_sim_application.h"
+#define BANANA true
 
 PistonObject::PistonObject() {
     m_piston = nullptr;
@@ -30,20 +31,40 @@ void PistonObject::render(const ViewParameters *view) {
     if (layer > view->Layer1 || layer < view->Layer0) return;
 
     const ysVector col = tintByLayer(m_app->getWhite(), layer - view->Layer0);
+    const ysVector col2 = tintByLayer(m_app->getYellow(), layer - view->Layer0);
     const ysVector holeCol = tintByLayer(m_app->getBackgroundColor(), layer - view->Layer0);
 
     resetShader();
-    setTransform(
-        &m_piston->m_body,
-        (float)(m_piston->getCylinderBank()->getBore() / 2),
-        0.0f,
-        (float)(-m_piston->getCompressionHeight() - m_piston->getWristPinLocation()));
+    
+    if (BANANA) {
+        const float scaleMult = 0.25f;
+        const float positionY = 0.015f;
 
-    m_app->getShaders()->SetBaseColor(col);
-    m_app->getEngine()->DrawModel(
-        m_app->getShaders()->GetRegularFlags(),
-        m_app->getAssetManager()->GetModelAsset("Piston"),
-        0x32 - layer);
+        setTransform(
+            &m_piston->m_body,
+            (float)(m_piston->getCylinderBank()->getBore() / 2) * scaleMult,
+            0.0f,
+            (float)(-m_piston->getCompressionHeight() - m_piston->getWristPinLocation()) + positionY);
+
+        m_app->getShaders()->SetBaseColor(col2);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("BANANA"),
+            0x32 - layer);
+    }
+    else {
+        setTransform(
+            &m_piston->m_body,
+            (float)(m_piston->getCylinderBank()->getBore() / 2),
+            0.0f,
+            (float)(-m_piston->getCompressionHeight() - m_piston->getWristPinLocation()));
+
+        m_app->getShaders()->SetBaseColor(col2);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("Piston"),
+            0x32 - layer);
+    }
 
     setTransform(&m_piston->m_body);
     m_app->getShaders()->SetBaseColor(holeCol);

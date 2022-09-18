@@ -1,5 +1,6 @@
 
 #include "../include/turbocharger.h"
+#include "../include/turbo.h"
 #include "../include/logger.h"
 
 //std::string to_string(double x);
@@ -48,6 +49,8 @@ double TurboCharger::AddPress()
 
 double lastThrottle = 0;
 bool played = false;
+int count = 0;
+int delay = 10;
 
 void TurboCharger::AddWhoosh(double exhaust)
 {
@@ -83,12 +86,29 @@ void TurboCharger::AddWhoosh(double exhaust)
 				played = true;
 			}
 
+			count++;
+			if (count >= delay && spool >= 0) {
+				count = 0;
+				delay = rand() % 150;
+				//stu
+				this->play = true;
+				//Logger::DebugLine("Stu ");
+			}
+
 			if (spool > -0.5)
-				spool -= 0.25;
+				spool -= 0.000000000000000000000000000000000000001;
 		}
 		else
 		{
+			count = 0;
 			played = false;
+		}
+
+		if (spool > 0.1) {
+			spoolSpin += spool / 10;
+		}
+		if (spoolSpin >= wastegateTrigger) {
+			spoolSpin = wastegateTrigger;
 		}
 
 		if (spool >= this->wastegateTrigger)
@@ -124,6 +144,32 @@ void TurboCharger::Log()
 	Logger::Debug("\n");
 	*/
 
+	Logger::DebugLine("[TurboCharger] spin: " + std::to_string(this->spoolSpin));
+	Logger::DebugLine("[TurboCharger] Spool: " + std::to_string(this->spool));
 	Logger::DebugLine("[TurboCharger] Pressure: " + std::to_string(this->AddPress()) + " Bar");
+}
+
+Turbo::Turbo() {
+	m_turbocharger = nullptr;
+}
+
+Turbo::~Turbo() {
+	/* void */
+}
+
+void Turbo::initialize(const Parameters& params) {
+	m_turbocharger = params.turbocharger;
+}
+
+void Turbo::destroy() {
+	/* void */
+}
+
+double Turbo::relativeX() const {
+	return m_body.p_x;
+}
+
+double Turbo::relativeY() const {
+	return m_body.p_y;
 }
 

@@ -272,10 +272,12 @@ void Simulator::placeAndInitialize() {
     m_engine->getIgnitionModule()->reset();
 }
 
+double tim = 0;
 void Simulator::startFrame(double dt) {
     m_simulationStart = std::chrono::steady_clock::now();
     m_currentIteration = 0;
     m_synthesizer.setInputSampleRate(m_simulationFrequency * m_simulationSpeed);
+    tim += dt;
 
     const double timestep = getTimestep();
     i_steps = (int)std::round((dt * m_simulationSpeed) / timestep);
@@ -314,6 +316,10 @@ int iter = 0;
 bool set = false;
 double revLimit;
 double revTimer;
+int cycle;
+bool canstu = false;
+
+bool flutter = false;
 
 bool Simulator::simulateStep() {
     if (m_currentIteration >= i_steps) {
@@ -445,11 +451,47 @@ bool Simulator::simulateStep() {
     {
         m_engine->getIgnitionModule()->retardTiming = false;
     }
+
+    /*
+    cycle--;
+    if (!procharger) {
+        if (!throttle) {
+            if (cycle <= 0 && canstu) {
+                // flutter
+                //Logger::DebugLine("Stu");
+                //m_turbocharger.play = true;
+                const int mult = 10000000 * m_turbocharger.spool;
+                if (mult <= 0) {
+                    canstu = true;
+                }
+                else {
+                    cycle = rand() % mult;
+                    cycle += 10;
+                }
+                flutter = true;
+            }
+            else {
+                flutter = false;
+            }
+        }
+        else {
+            canstu = true;
+            flutter = false;
+        }
+    }
+    */
     m_engine->getIgnitionModule()->m_limiterDuration = 0.02;
 
     im->resetIgnitionEvents();
 
-    writeToSynthesizer();
+    double noise = sin(tim) * 222222;
+    double sound = noise * (m_turbocharger.spool / m_turbocharger.wastegateTrigger);
+    double value = *m_exhaustFlowStagingBuffer;
+    value += sound;
+    if (value < 0)
+        value = 0;
+
+    writeToSynthesizer(value);
 
     ++m_currentIteration;
 
@@ -516,13 +558,16 @@ void Simulator::updateFilteredEngineSpeed(double dt) {
     m_filteredEngineSpeed = alpha * m_filteredEngineSpeed + (1 - alpha) * m_engine->getRpm();
 }
 
-void Simulator::writeToSynthesizer() {
+#include "../include/logger.h"
+
+int iterr = 0;
+void Simulator::writeToSynthesizer(double other) {
     const int exhaustSystemCount = m_engine->getExhaustSystemCount();
     for (int i = 0; i < exhaustSystemCount; ++i) {
         m_exhaustFlowStagingBuffer[i] = 0;
     }
 
-    const double attenuation = std::min(std::abs(m_filteredEngineSpeed), 40.0) / 40.0;
+    const double attenuation = min(std::abs(m_filteredEngineSpeed), 40.0) / 40.0;
     const double attenuation_3 = attenuation * attenuation * attenuation;
 
     for (int i = 0; i < exhaustSystemCount; ++i) {
@@ -552,5 +597,12 @@ void Simulator::writeToSynthesizer() {
             exhaustSystem->getAudioVolume() * exhaustFlow / cylinderCount;
     }
 
+    m_exhaustFlowStagingBuffer = &other;
+
     m_synthesizer.writeInput(m_exhaustFlowStagingBuffer);
+    if (flutter) {
+        const double sh = 234234234;
+        Logger::DebugLine("stu");
+        m_synthesizer.writeInput(&sh);
+    }
 }

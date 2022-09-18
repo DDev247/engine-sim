@@ -73,6 +73,7 @@ public node audi_i5_2_2L {
     engine engine(
         name: "Audi 2.2 inline 5",
         starter_torque: 200 * units.lb_ft,
+		starter_speed: 600 * units.rpm,
         redline: 7500 * units.rpm,
         fuel: fuel(
             max_turbulence_effect: 4.0,

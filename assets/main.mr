@@ -7,5 +7,5 @@ import "engines/custom/2RZ-EF.mr"
 import "engines/audi/i5.mr"
 
 set_engine(
-    engine: audi_i5_2_2L()
+    engine: m52b28()
 )

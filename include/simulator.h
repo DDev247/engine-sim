@@ -93,7 +93,7 @@ class Simulator {
         
     protected:
         void updateFilteredEngineSpeed(double dt);
-        void writeToSynthesizer();
+        void writeToSynthesizer(double other);
 
     protected:
         atg_scs::RigidBodySystem *m_system;
@@ -128,6 +128,7 @@ class Simulator {
 
     public:
         bool antilagOn;
+        bool throttle;
         ProCharger m_procharger;
         TurboCharger m_turbocharger;
 };

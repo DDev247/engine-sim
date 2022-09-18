@@ -21,6 +21,8 @@
 #include <sstream>
 
 #include "../include/logger.h"
+#include "../include/turbocharger_object.h"
+#include "../include/turbo.h"
 
 #if ATG_ENGINE_DISCORD_ENABLED
 #include "../discord/Discord.h"
@@ -667,18 +669,32 @@ void EngineSimApplication::run() {
         targetThrottle = fineControlMode ? targetThrottle : 1.0;
         if (m_engine.IsKeyDown(ysKey::Code::Q)) {
             targetThrottle = 0.99;
+            m_simulator.throttle = true;
+            m_simulator.m_turbocharger.mthr = true;
         }
         else if (m_engine.IsKeyDown(ysKey::Code::W)) {
             targetThrottle = 0.9;
+            m_simulator.throttle = true;
+            m_simulator.m_turbocharger.mthr = true;
         }
         else if (m_engine.IsKeyDown(ysKey::Code::E)) {
             targetThrottle = 0.8;
+            m_simulator.throttle = true;
+            m_simulator.m_turbocharger.mthr = true;
         }
         else if (m_engine.IsKeyDown(ysKey::Code::R)) {
             targetThrottle = 0.0;
+            m_simulator.throttle = true;
+            m_simulator.m_turbocharger.mthr = true;
         }
         else if (fineControlMode && !fineControlInUse) {
             targetThrottle = std::fmax(0.0, std::fmin(1.0, targetThrottle - mouseWheelDelta * 0.0001));
+            m_simulator.throttle = true;
+            m_simulator.m_turbocharger.mthr = true;
+        }
+        else {
+            m_simulator.throttle = false;
+            m_simulator.m_turbocharger.mthr = false;
         }
 
         if (prevTargetThrottle != targetThrottle) {
@@ -1021,6 +1037,12 @@ void EngineSimApplication::createObjects(Engine *engine) {
         chObject->m_engine = engine;
         m_objects.push_back(chObject);
     }
+
+    TurbochargerObject* turbochargerObject = new TurbochargerObject;
+    turbochargerObject->initialize(this);
+    turbochargerObject->m_turbocharger = &m_simulator.m_turbocharger;
+    turbochargerObject->m_turbo = new Turbo();
+    m_objects.push_back(turbochargerObject);
 }
 
 const SimulationObject::ViewParameters &EngineSimApplication

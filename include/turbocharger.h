@@ -24,6 +24,7 @@ public:
 	bool IS_ENABLED = true;
 
 	double spool;
+	double spoolSpin;
 	const double spoolBoostMult = 0.00001;
 	//const double spoolBoostMult = 0.0;
 	const double spoolMult = 100;
@@ -35,6 +36,7 @@ public:
 	const double antilagBoost = 0.1;
 	
 	double throttle = 0.0;
+	bool mthr = false;
 
 	bool play = false;
 
