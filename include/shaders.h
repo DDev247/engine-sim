@@ -34,6 +34,7 @@ class Shaders : public dbasic::ShaderBase {
             const Bounds &cameraBounds,
             float screenWidth,
             float screenHeight,
+            float fovY,
             float phi,
             float theta,
             float zoom = 1.0f,

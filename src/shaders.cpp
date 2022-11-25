@@ -153,6 +153,7 @@ void Shaders::CalculateCamera(
     const Bounds &cameraBounds,
     float screenWidth,
     float screenHeight,
+    float fovY,
     float phi,
     float theta,
     float zoom,
@@ -169,7 +170,7 @@ void Shaders::CalculateCamera(
         500.0f);
 
     const ysMatrix projection = ysMath::FrustrumPerspective(
-        19.0f,
+        fovY,
         width/height,
         0.03f,
         1400.0f);

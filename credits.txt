@@ -3,6 +3,21 @@ Engine Simulator by AngeTheGreat:
 https://github.com/ange-yaghi/engine-sim
 
 
+Code and help:
+
+DDev
+
+Testing:
+
+Eisberg, Beacrox
+
+
+
+Default engine in 3d version, 4A-GEU.mr -file:
+https://catalog.engine-sim.parts/parts/347 made by MaximumQC
+(i needed to edit something because i was using old version of ES)
+
+
 Original 3D models:
 
 Engine 3D Model:
@@ -10,7 +25,10 @@ https://sketchfab.com/3d-models/2jz-ge-engine-0289ac9eb3fb4e7eba1535fba6043024 b
 
 Tracks:
 https://sketchfab.com/3d-models/race-trackkarting-track-based-on-south-garda-32c21042ba144ce9bd2822a88d5b54ec by Mauro3D is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+
+I used these parts (WIP):
 https://sketchfab.com/3d-models/modular-kit-city-development-711bedfcfaf945afb7138da65ad0d6df by Pieter Ferreira is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+
 
 Cars:
 "Datsun 510 Bluebird wagon - Low poly model" (https://skfb.ly/6Vw9o) by Daniel Zhabotinsky is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
@@ -20,6 +38,11 @@ Cars:
 
 I have edited 3d models to get them working in Engine Simulator, joining, splitting by material, moving origin etc
 
-Thank you!
+Linux version:
+
+bobsayshilol, phire, rhys
+
+
+Hard to remember all who have helped many ways, but thank you all!
 
 -jotalamp

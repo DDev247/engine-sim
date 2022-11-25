@@ -21,7 +21,6 @@ TireObject::TireObject(EngineSimApplication *app, b2World *world, Vehicle *vehic
 
     ysQuaternion orientation = ysMath::QuatMultiply(qx, qy);
     m_transform_model.SetOrientation(orientation);
-    //m_transform_model.SetParent(&m_transform);
 
     m_vehicle_body = vehicleBody;
     m_vehicle_transform = vehicleTransform;
@@ -199,38 +198,38 @@ void TireObject::render(const ViewParameters *view)
 
     //////
 
-    //ysQuaternion qx2 = ysMath::LoadQuaternion(-m_body->GetAngle() + ysMath::Constants::PI + 0 * m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::XAxis);
-    //ysQuaternion qy2 = ysMath::LoadQuaternion(m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::YAxis);
-    //ysQuaternion qz2 = ysMath::LoadQuaternion(0.5f * ysMath::Constants::PI, ysMath::Constants::ZAxis);
+    // ysQuaternion qx2 = ysMath::LoadQuaternion(-m_body->GetAngle() + ysMath::Constants::PI + 0 * m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::XAxis);
+    // ysQuaternion qy2 = ysMath::LoadQuaternion(m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::YAxis);
+    // ysQuaternion qz2 = ysMath::LoadQuaternion(0.5f * ysMath::Constants::PI, ysMath::Constants::ZAxis);
 
-    //ysQuaternion qx3 = ysMath::LoadQuaternion(-m_body->GetAngle() + ysMath::Constants::PI + 0 * m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::XAxis);
-    //ysQuaternion qy3 = ysMath::LoadQuaternion(m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::YAxis);
+    // ysQuaternion qx3 = ysMath::LoadQuaternion(-m_body->GetAngle() + ysMath::Constants::PI + 0 * m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::XAxis);
+    // ysQuaternion qy3 = ysMath::LoadQuaternion(m_rotation * m_app->getSimulator()->getSimulationSpeed(), ysMath::Constants::YAxis);
     ysQuaternion qz3 = ysMath::LoadQuaternion(m_modelRotation[2] * ysMath::Constants::PI, ysMath::Constants::ZAxis);
 
     ysTransform transform2;
     transform2.SetOrientation(qz3);
     transform2.SetParent(&transform);
-    //transform2.SetPosition(ysMath::LoadVector((float)p_x, -0.45f, (float)p_y, 0.0f));
+    // transform2.SetPosition(ysMath::LoadVector((float)p_x, -0.45f, (float)p_y, 0.0f));
 
     m_app->getShaders()->SetObjectTransform(transform2.GetWorldTransform());
 
     m_app->getShaders()->UseMaterial(m_app->getAssetManager()->FindMaterial("MaterialWheel"));
 
-    int meshesPerTireModel = m_mesh_names.size()/2;
+    int meshesPerTireModel = m_mesh_names.size() / 2;
 
     for (std::vector<std::string>::size_type i = 0; i != meshesPerTireModel; i++)
-        {
-            int j = i;
-            if(m_side == Right)
-                j += meshesPerTireModel;
+    {
+        int j = i;
+        if (m_side == Right)
+            j += meshesPerTireModel;
 
-            m_app->getShaders()->UseMaterial(m_app->getAssetManager()->FindMaterial(m_material_names[j].c_str()));
+        m_app->getShaders()->UseMaterial(m_app->getAssetManager()->FindMaterial(m_material_names[j].c_str()));
 
-            m_app->getEngine()->DrawModel(
-                m_app->getShaders()->GetRegularFlags(),
-                m_app->getAssetManager()->GetModelAsset(m_mesh_names[j].c_str()),
-                1);
-        }
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset(m_mesh_names[j].c_str()),
+            1);
+    }
     return;
     if (m_side == Left)
     {
@@ -266,7 +265,6 @@ void TireObject::render(const ViewParameters *view)
             1);
     }
 
-    
     return;
 
     if (m_side == Right)
@@ -329,68 +327,27 @@ void TireObject::render(const ViewParameters *view)
 
 void TireObject::process(float dt, float rotationSpeed)
 {
-    if (false)
-    {
-        float frictionLimit = 0.5f;
-        b2Vec2 lv = getLateralVelocity();
-        float l = lv.Length();
+    float frictionLimit = 0.6f;
 
-        if (l > frictionLimit)
-            lv = 0.9f * (frictionLimit / l * lv) + 0.1f * lv;
+    b2Vec2 currentForwardNormal = m_body->GetWorldVector(b2Vec2(0, 1));
 
-        // Update friction
-        b2Vec2 impulse = m_body->GetMass() * -lv;
+    b2Vec2 lv = getLateralVelocity();
 
-        m_body->ApplyLinearImpulse(impulse, m_body->GetWorldCenter(), true);
-        // m_body->ApplyAngularImpulse( 0.2f * m_body->GetInertia() * -m_body->GetAngularVelocity(), true );
-    }
-    if (true)
-    {
-        float frictionLimit = 0.6f;
+    if (m_drive)
+        lv += getForwardVelocity() - rotationSpeed * currentForwardNormal;
 
-        b2Vec2 currentForwardNormal = m_body->GetWorldVector(b2Vec2(0, 1));
+    float l = lv.Length();
 
-        b2Vec2 lv = getLateralVelocity();
+    float factor = 0.91f;
 
-        if (m_drive)
-            lv += getForwardVelocity() - rotationSpeed * currentForwardNormal;
+    if (l > frictionLimit)
+        lv = factor * (frictionLimit / l * lv) + (1.0f - factor) * lv;
 
-        if(false)
-            lv = getForwardVelocity() - rotationSpeed * currentForwardNormal;
+    // Update friction
+    b2Vec2 impulse = m_body->GetMass() * -lv;
 
-        float l = lv.Length();
-
-        if (l > frictionLimit)
-            lv = 0.9f * (frictionLimit / l * lv) + 0.1f * lv;
-
-        // Update friction
-        b2Vec2 impulse = m_body->GetMass() * -lv;
-
-        m_body->ApplyLinearImpulse(impulse, m_body->GetWorldCenter(), true);
-        // m_body->ApplyAngularImpulse( 0.2f * m_body->GetInertia() * -m_body->GetAngularVelocity(), true );
-
-        if (false)
-        {
-            float frictionLimit2 = 0.1f;
-
-            // b2Vec2 currentForwardNormal = m_body->GetWorldVector(b2Vec2(0, 1));
-
-            float realSpeed = m_body->GetLocalVector(m_body->GetLinearVelocity()).y;
-
-            b2Vec2 fv = getForwardVelocity() - rotationSpeed * currentForwardNormal;
-
-            float lw = fv.Length();
-
-            if (lw > frictionLimit)
-                fv = 0.9f * (frictionLimit2 / lw * fv) + 0.1f * fv;
-
-            // Update friction
-            b2Vec2 impulse2 = m_body->GetMass() * -fv;
-
-            // m_body->ApplyLinearImpulse(impulse2, m_body->GetWorldCenter(), true);
-            //  m_body->ApplyAngularImpulse( 0.2f * m_body->GetInertia() * -m_body->GetAngularVelocity(), true );
-        }
-    }
+    m_body->ApplyLinearImpulse(impulse, m_body->GetWorldCenter(), true);
+    // m_body->ApplyAngularImpulse( 0.2f * m_body->GetInertia() * -m_body->GetAngularVelocity(), true );
 }
 
 void TireObject::destroy()

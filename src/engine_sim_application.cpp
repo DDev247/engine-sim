@@ -196,14 +196,15 @@ void EngineSimApplication::initialize(void *instance, ysContextObject::DeviceAPI
     initialize();
 }
 
-void EngineSimApplication::loadMaterial(std::string filename, std::string name) {
+void EngineSimApplication::loadMaterial(std::string filename, std::string name)
+{
     dbasic::TextureAsset *textureAsset;
     dbasic::Material *material;
 
-    printf(("Loading Material: " + name + "\n").c_str());
+    printf(("\nLoading Material: " + name).c_str());
 
-    const char* textureName = ("Texture" + name).c_str();
-    const char* materialName = ("Material" + name).c_str();
+    const char *textureName = ("Texture" + name).c_str();
+    const char *materialName = ("Material" + name).c_str();
 
     m_assetManager.LoadTexture(filename.c_str(), textureName);
     textureAsset = m_assetManager.GetTexture(textureName);
@@ -216,18 +217,25 @@ void EngineSimApplication::loadMaterial(std::string filename, std::string name) 
 void EngineSimApplication::initialize()
 {
     m_iniReader = inih::INIReader{"../settings.ini"};
+
     m_selected_track = m_iniReader.Get<int>("Settings", "SelectedTrack");
     printf("\nSelected Track: %i", m_selected_track);
+
     m_show_engine = m_iniReader.Get<bool>("Settings", "ShowEngine");
     printf("\nShowing engine: %i", m_show_engine);
+
+    m_fovY = m_iniReader.Get<float>("Camera", "FovY");
+    printf("\nFovY: %f", m_fovY);
+    m_fovY *= (ysMath::Constants::PI / 180.0f);
+
+    m_zoom = m_iniReader.Get<float>("Camera", "Zoom");
+    printf("\nZoom: %f", m_zoom);
 
     // Define the gravity vector.
     b2Vec2 gravity(0.0f, 0.0f);
 
     // Construct a world object, which will hold and simulate the rigid bodies.
     m_world = new b2World(gravity);
-
-    zoom = 20.0f;
 
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
@@ -431,7 +439,7 @@ void EngineSimApplication::initialize()
 
     std::chrono::steady_clock::time_point material_end = std::chrono::steady_clock::now();
     printf("Model loading took: ");
-    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds> (material_end - begin).count())).c_str());
+    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(material_end - begin).count())).c_str());
     printf(" ms.\n");
 
     std::chrono::steady_clock::time_point model_begin = std::chrono::steady_clock::now();
@@ -505,7 +513,7 @@ void EngineSimApplication::initialize()
 
     std::chrono::steady_clock::time_point model_end = std::chrono::steady_clock::now();
     printf("Model/ES loading took: ");
-    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds> (model_end - model_begin).count())).c_str());
+    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(model_end - model_begin).count())).c_str());
     printf(" ms.\n");
 
     std::chrono::steady_clock::time_point joy_begin = std::chrono::steady_clock::now();
@@ -557,7 +565,7 @@ void EngineSimApplication::initialize()
             std::string selectedControllerName = SDL_JoystickNameForIndex(selectedController);
             m_infoCluster->setLogMessage(joyOrGC + ": " + selectedControllerName);
             printf("\n%s: %s\n\n", joyOrGC.c_str(), selectedControllerName.c_str());
-
+            
             gJoystick = SDL_JoystickOpen(selectedController);
 
             if (gJoystick == NULL)
@@ -569,12 +577,12 @@ void EngineSimApplication::initialize()
 
     std::chrono::steady_clock::time_point joy_end = std::chrono::steady_clock::now();
     printf("Joystick Loading took: ");
-    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds> (joy_end - joy_begin).count())).c_str());
+    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(joy_end - joy_begin).count())).c_str());
     printf(" ms.\n");
 
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     printf("Loading took: ");
-    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds> (end - begin).count())).c_str());
+    printf((std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count())).c_str());
     printf(" ms.\n");
 
 #ifdef ATG_ENGINE_DISCORD_ENABLED
@@ -593,7 +601,7 @@ void EngineSimApplication::initialize()
 
 void EngineSimApplication::process(float frame_dt)
 {
-    
+
     // Prepare for simulation. Typically we use a time step of 1/60 of a
     // second (60Hz) and 10 iterations. This provides a high quality simulation
     // in most game scenarios.
@@ -631,7 +639,7 @@ void EngineSimApplication::process(float frame_dt)
     m_simulator.setSimulationSpeed(speed);
 
     m_world->Step(speed * frame_dt, velocityIterations, positionIterations);
-    
+
     m_vehicle_object->process(speed * frame_dt);
 
     const double avgFramerate = clamp(m_engine.GetAverageFramerate(), 30.0f, 1000.0f);
@@ -1178,7 +1186,7 @@ void EngineSimApplication::processEngineInput()
     const int mouseWheelDelta = mouseWheel - m_lastMouseWheel;
     m_lastMouseWheel = mouseWheel;
 
-    zoom = clamp(zoom - 0.01f * mouseWheelDelta, 0.9f, 90.0f);
+    m_zoom = clamp(m_zoom - 0.01f * mouseWheelDelta, 0.9f, 90.0f);
 
     if (m_engine.ProcessJoystickButtonDown(ysJoystick::Button::Button_Back))
     {
@@ -1495,7 +1503,7 @@ void EngineSimApplication::processEngineInput()
 
 void EngineSimApplication::renderScene()
 {
-    
+
     getShaders()->ResetBaseColor();
     getShaders()->SetObjectTransform(ysMath::LoadIdentity());
 
@@ -1511,8 +1519,6 @@ void EngineSimApplication::renderScene()
     m_shaders.CalculateUiCamera(screenWidth, screenHeight);
 
     m_screen = m_screen % 4;
-
-    
 
     switch (m_screen)
     {
@@ -1622,7 +1628,8 @@ void EngineSimApplication::renderScene()
 
         m_customGaugeCluster->setVisible(true);
 
-        // m_oscCluster->activate();
+        SDL_ShowCursor(SDL_DISABLE);
+
         break;
     }
     }
@@ -1643,14 +1650,12 @@ void EngineSimApplication::renderScene()
     bool isTargetEngine;
 
     if (m_screen == 0)
-        isTargetEngine = true;
+        isTargetEngine = false;
     else
         isTargetEngine = true;
 
     int mx, my, mz;
     m_engine.GetMousePos(&mx, &my);
-
-    
 
     if (m_engine.IsMouseButtonDown(ysMouse::Button::Left))
     {
@@ -1658,31 +1663,41 @@ void EngineSimApplication::renderScene()
         float deltaY = -0.0004f * (my - m_dragStartMousePosition.y);
 
         if (abs(deltaX) > 0.001f)
-        {
             m_cameraRotation.x += deltaX;
-        }
 
         if (abs(deltaY) > 0.001f)
             m_cameraRotation.y += deltaY;
 
-        m_cameraRotation.y = clamp(m_cameraRotation.y, 0.01f * ysMath::Constants::PI, 0.5f * ysMath::Constants::PI);
+        
     }
     else if (!isTargetEngine)
     {
         float rotationSpeed = 0.06f;
         m_cameraRotation.x = (1.0f - rotationSpeed) * m_cameraRotation.x - rotationSpeed * (m_simulator.getVehicle()->m_rotation + 0.5f * ysMath::Constants::PI);
+        
+        int ry = m_engine.GetJoystickAxisRY();
+
+        if(abs(ry)>2000)
+            m_cameraRotation.y += 0.000001f * ry;
+    }
+    else
+    {
+        int rx = m_engine.GetJoystickAxisRX();
+        int ry = m_engine.GetJoystickAxisRY();
+
+        if(abs(rx)>2000)
+            m_cameraRotation.x -= 0.000001f * rx;
+        if(abs(ry)>2000)
+            m_cameraRotation.y += 0.000001f * ry;
     }
 
-    
+    m_cameraRotation.y = clamp(m_cameraRotation.y, 0.01f * ysMath::Constants::PI, 0.5f * ysMath::Constants::PI);
 
-    // TODO
-    //if(false)
     if (!isTargetEngine)
     {
-        float vehicleAngle = 0;//m_simulator.getVehicle()->m_rotation;
+        float vehicleAngle = m_simulator.getVehicle()->m_rotation;
         float cameraTargetForward = 0.9f;
 
-        //if(false)
         m_shaders.CalculateCamera(
             cameraAspectRatio * m_displayHeight / m_engineView->m_zoom,
             m_displayHeight / m_engineView->m_zoom,
@@ -1692,9 +1707,11 @@ void EngineSimApplication::renderScene()
             m_screenWidth,
             m_screenHeight,
 
+            m_fovY,
+
             m_cameraRotation.x,
             m_cameraRotation.y,
-            zoom,
+            m_zoom,
 
             m_simulator.getVehicle()->m_transform_camera->GetWorldPosition()[0] + cameraTargetForward * sin(vehicleAngle),
             m_simulator.getVehicle()->m_transform_camera->GetWorldPosition()[1],
@@ -1702,7 +1719,6 @@ void EngineSimApplication::renderScene()
     }
     else
     {
-        //if(false)
         m_shaders.CalculateCamera(
             cameraAspectRatio * m_displayHeight / m_engineView->m_zoom,
             m_displayHeight / m_engineView->m_zoom,
@@ -1712,21 +1728,20 @@ void EngineSimApplication::renderScene()
             m_screenWidth,
             m_screenHeight,
 
+            m_fovY,
+
             m_cameraRotation.x,
             m_cameraRotation.y,
-            zoom,
+            m_zoom,
 
             m_simulator.getVehicle()->m_transform_engine->GetWorldPosition()[0],
             m_simulator.getVehicle()->m_transform_engine->GetWorldPosition()[1],
             m_simulator.getVehicle()->m_transform_engine->GetWorldPosition()[2] + m_simulator.getEngine()->getCylinderCount() / m_simulator.getEngine()->getCylinderBankCount() * 0.04f);
     }
-    //return;
 
     m_geometryGenerator.reset();
 
     render();
-
-    
 
     m_engine.GetDevice()->EditBufferDataRange(
         m_geometryVertexBuffer,

@@ -213,7 +213,8 @@ class EngineSimApplication {
 
         int m_oscillatorSampleOffset;
         int m_screen;
-        float zoom;
+        float m_fovY;
+        float m_zoom;
 
 #ifdef ATG_ENGINE_SIM_VIDEO_CAPTURE
         atg_dtv::Encoder m_encoder;

@@ -170,6 +170,8 @@ void VehicleObject::render(const ViewParameters *view)
 
     //rotation = (float)m_vehicle->m_rotation;
 
+    
+
     m_app->getShaders()->UseMaterial(m_app->getAssetManager()->FindMaterial("Material_02"));
 
     //float speedfactor = 0.1f * m_app->getSimulator()->getSimulationSpeed();
@@ -391,6 +393,8 @@ void VehicleObject::process(float dt)
                 m_tires[i]->process(dt, +targetSpeedFromTireRotationSpeed);
         }
     }
+
+    m_vehicle->m_rotation = -m_body->GetAngle();
 }
 
 void VehicleObject::destroy()
