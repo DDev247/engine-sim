@@ -87,6 +87,8 @@ class EngineSimApplication {
         Simulator *getSimulator() { return &m_simulator; }
         InfoCluster *getInfoCluster() { return m_infoCluster; }
         ApplicationSettings* getAppSettings() { return &m_applicationSettings; }
+        
+        Engine* m_iceEngine;
 
     protected:
         void loadScript();
@@ -130,7 +132,6 @@ class EngineSimApplication {
         dbasic::TextRenderer m_textRenderer;
 
         std::vector<SimulationObject *> m_objects;
-        Engine *m_iceEngine;
         Vehicle *m_vehicle;
         Transmission *m_transmission;
         Simulator m_simulator;

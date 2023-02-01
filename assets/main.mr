@@ -1,13 +1,15 @@
 import "engine_sim.mr"
-import "engines/kohler/kohler_ch750.mr"
-import "engines/chevrolet/chev_truck_454.mr"
-import "engines/custom/4.0_i6.mr"
-import "engines/custom/sr20de.mr"
+//import "engines/kohler/kohler_ch750.mr"
+//import "engines/kohler/kohler_lawn.mr"
+//import "engines/chevrolet/chev_truck_454ORG.mr"
+//import "engines/custom/4.0_i6.mr"
+//import "engines/custom/sr20de.mr"
 import "engines/custom/2RZ-EF.mr"
 import "themes/default.mr"
 import "engines/audi/i5.mr"
 
 use_default_theme()
+//main()
 set_engine(
     engine: m52b28()
 )

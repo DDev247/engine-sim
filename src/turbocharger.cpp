@@ -23,6 +23,8 @@ void TurboCharger::LoadStuff(EngineSimApplication* sim)
 	audio = sim->getAssetManager()->GetAudioAsset("flutter");
 	//waste = sim->getAssetManager()->GetAudioAsset("wastegate");
 	app = sim;
+
+	
 }
 
 void TurboCharger::frame() 

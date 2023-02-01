@@ -28,7 +28,7 @@ void TurbochargerObject::generateGeometry() {
 float turboangle = 0;
 void TurbochargerObject::render(const ViewParameters* view) {
     const int layer = 0;
-    if (layer > view->Layer1 || layer < view->Layer0) return;
+    //if (layer > view->Layer1 || layer < view->Layer0) return;
 
     const ysVector col = tintByLayer(m_app->getBlue(), layer - view->Layer0);
     const ysVector col2 = tintByLayer(m_app->getPink(), layer - view->Layer0);
@@ -37,7 +37,8 @@ void TurbochargerObject::render(const ViewParameters* view) {
     resetShader();
 
     if (this->m_turbocharger->spoolSpin > 0.1) {
-        turboangle += this->m_turbocharger->spoolSpin * this->angleMultiplier;
+        double simSpeed = this->m_app->getSimulator()->getSimulationSpeed();
+        turboangle += (this->m_turbocharger->spoolSpin * this->angleMultiplier)* simSpeed;
         this->m_turbocharger->spoolSpin -= 0.005;
     }
 
@@ -50,54 +51,110 @@ void TurbochargerObject::render(const ViewParameters* view) {
 
     float angle = fmod(turboangle, 360) * 0.01745329251f;
     const float scaleMultiplier = 0.53f;
+    const float scaleMultiplierSmall = 0.47f;
     const float positionX = 0.12f;
     const float positionY = 0.298f;
+    const float positionX2 = 0.12f;
+    const float positionY2 = 0.298f;
     const float bodyRotation = 270.0f * 0.01745329251f;
+    const float bodyRotation2 = 270.0f * 0.01745329251f;
 
-    setTransform(
-        &m_turbo->m_body,
-        0.075f * scaleMultiplier,
-        0.0f + positionX,
-        0.0f + positionY,
-        angle);
-
-    m_app->getShaders()->SetBaseColor(col);
-    m_app->getEngine()->DrawModel(
-        m_app->getShaders()->GetRegularFlags(),
-        m_app->getAssetManager()->GetModelAsset("TurboImpeller"),
-        0x32 - layer + 3);
-
-    m_app->getShaders()->SetBaseColor(holeCol);
-    m_app->getEngine()->DrawModel(
-        m_app->getShaders()->GetRegularFlags(),
-        m_app->getAssetManager()->GetModelAsset("TurboHole"),
-        0x32 - layer + 1);
-
-    setTransform(
-        &m_turbo->m_body,
-        0.02f * scaleMultiplier,
-        0.0f + positionX,
-        0.0f + positionY,
-        0.0f);
-
-    m_app->getShaders()->SetBaseColor(col);
-    m_app->getEngine()->DrawModel(
-        m_app->getShaders()->GetRegularFlags(),
-        m_app->getAssetManager()->GetModelAsset("TurboHole"),
-        0x32 - layer + 2);
-
-    setTransform(
-        &m_turbo->m_body,
-        0.1f * scaleMultiplier,
-        0.0f + positionX,
-        0.0f + positionY,
-        bodyRotation);
-
-    m_app->getShaders()->SetBaseColor(col2);
-    m_app->getEngine()->DrawModel(
-        m_app->getShaders()->GetRegularFlags(),
-        m_app->getAssetManager()->GetModelAsset("TurboBody"),
-        0x32 - layer);
+    if (view->Layer0 < view->Layer1 / 2) {
+        // exhaust side
+    
+        setTransform(
+            &m_turbo->m_body,
+            0.075f * scaleMultiplier,
+            0.0f + positionX,
+            0.0f + positionY,
+            angle);
+    
+        m_app->getShaders()->SetBaseColor(col);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboImpeller"),
+            0x32 - layer + 3);
+    
+        m_app->getShaders()->SetBaseColor(holeCol);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboHole"),
+            0x32 - layer + 1);
+    
+        setTransform(
+            &m_turbo->m_body,
+            0.02f * scaleMultiplier,
+            0.0f + positionX,
+            0.0f + positionY,
+            0.0f);
+    
+        m_app->getShaders()->SetBaseColor(col);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboHole"),
+            0x32 - layer + 2);
+    
+        setTransform(
+            &m_turbo->m_body,
+            0.1f * scaleMultiplier,
+            0.0f + positionX,
+            0.0f + positionY,
+            bodyRotation);
+    
+        m_app->getShaders()->SetBaseColor(col2);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboBody"),
+            0x32 - layer);
+    }
+    else {
+        // intake side
+    
+        setTransform(
+            &m_turbo->m_body,
+            0.075f * scaleMultiplierSmall,
+            0.0f + positionX2,
+            0.0f + positionY2,
+            angle);
+    
+        m_app->getShaders()->SetBaseColor(col);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboImpeller"),
+            0x32 - layer + 3);
+    
+        m_app->getShaders()->SetBaseColor(holeCol);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboHole"),
+            0x32 - layer + 1);
+    
+        setTransform(
+            &m_turbo->m_body,
+            0.02f * scaleMultiplierSmall,
+            0.0f + positionX2,
+            0.0f + positionY2,
+            0.0f);
+    
+        m_app->getShaders()->SetBaseColor(col);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboHole"),
+            0x32 - layer + 2);
+    
+        setTransform(
+            &m_turbo->m_body,
+            0.1f * scaleMultiplierSmall,
+            0.0f + positionX2,
+            0.0f + positionY2,
+            bodyRotation2);
+    
+        m_app->getShaders()->SetBaseColor(col2);
+        m_app->getEngine()->DrawModel(
+            m_app->getShaders()->GetRegularFlags(),
+            m_app->getAssetManager()->GetModelAsset("TurboBody2"),
+            0x32 - layer);
+    }
 }
 
 void TurbochargerObject::process(float dt) {

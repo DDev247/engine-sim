@@ -32,7 +32,7 @@ class Engine : public Part {
             double StarterSpeed = units::rpm(200);
             double Redline = units::rpm(6500);
 
-            Throttle *throttle;
+            Throttle* throttle;
 
             double initialSimulationFrequency;
             double initialHighFrequencyGain;

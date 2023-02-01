@@ -114,7 +114,7 @@ double IgnitionModule::getTimingAdvance() {
     else
     {
         double rpm = m_crankshaft->m_body.v_theta;
-        return m_timingCurve->sampleTriangle(-m_crankshaft->m_body.v_theta) + 450;
+        return m_timingCurve->sampleTriangle(-m_crankshaft->m_body.v_theta) + retardAngle;
     }
 }
 

@@ -45,6 +45,7 @@ class IgnitionModule : public Part {
         Function* m_timingCurve;
 
         bool retardTiming = false;
+        double retardAngle = 350;
         double m_limiterDuration;
 
         double m_revLimitTimer;

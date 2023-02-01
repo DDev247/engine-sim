@@ -18,13 +18,14 @@ public:
 
 	const bool IS_ENABLED = true;
 
-	const double maxSpool = 5;
 	double spool;
-	const double spoolBoostMult = 0.00001;
-	//const double spoolBoostMult = 0.0;
-	const double spoolMult = 0.1;
-	const double frictionSub = 4;
-	const double outputPressDiv = 5;
+	
+	// constants
+	double maxSpool = 5;
+	double spoolBoostMult = 0.00001;
+	double spoolMult = 0.1;
+	double frictionSub = 4;
+	double outputPressDiv = 5;
 
 	// returns how much more pressure to add to output bruh
 	double AddMoPowahBaby();
@@ -32,7 +33,7 @@ public:
 	// returns how much more pressure to add to output bruh
 	double AddPress();
 
-	// tries to spool turbo bruh
+	// tries to spool procharger bruh
 	void AddWhoosh(double rpm);
 
 	// tries to get current turbo boost

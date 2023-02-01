@@ -108,6 +108,14 @@ add_library(engine-sim STATIC
     src/vehicle_drag_constraint.cpp
     src/vtec_valvetrain.cpp
 
+    src/turbocharger.cpp
+	src/supercharger.cpp
+    src/procharger.cpp
+    src/turbocharger_object.cpp
+	src/supercharger_object.cpp
+    src/logger.cpp
+    src/logger.cpp
+
     # Include files
     include/audio_buffer.h
     include/application_settings.h
@@ -150,6 +158,13 @@ add_library(engine-sim STATIC
     include/vehicle.h
     include/vehicle_drag_constraint.h
     include/vtec_valvetrain.h
+
+    include/turbocharger.h
+    include/procharger.h
+	include/supercharger.h
+    include/turbocharger_object.h
+	include/supercharger_object.h
+    include/logger.h
 )
 
 target_link_libraries(engine-sim
@@ -255,6 +270,14 @@ add_executable(engine-sim-app WIN32
     src/load_simulation_cluster.cpp
     src/mixer_cluster.cpp
     src/info_cluster.cpp
+    
+    src/turbocharger.cpp
+	src/supercharger.cpp
+    src/procharger.cpp
+    src/turbocharger_object.cpp
+	src/supercharger_object.cpp
+    src/logger.cpp
+    src/logger.cpp
 
     # Include files
     include/delta.h
@@ -290,6 +313,13 @@ add_executable(engine-sim-app WIN32
     include/load_simulation_cluster.h
     include/mixer_cluster.h
     include/info_cluster.h
+
+    include/turbocharger.h
+    include/procharger.h
+	include/supercharger.h
+    include/turbocharger_object.h
+	include/supercharger_object.h
+    include/logger.h
 )
 
 target_link_libraries(engine-sim-app

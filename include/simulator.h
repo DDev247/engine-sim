@@ -12,6 +12,7 @@
 #include "vehicle_drag_constraint.h"
 #include "procharger.h"
 #include "turbocharger.h"
+#include "supercharger.h"
 
 #include "scs.h"
 
@@ -129,8 +130,10 @@ class Simulator {
     public:
         bool antilagOn;
         bool throttle;
+        bool backfiring;
         ProCharger m_procharger;
         TurboCharger m_turbocharger;
+        SuperCharger m_supercharger;
 };
 
 #endif /* ATG_ENGINE_SIM_SIMULATOR_H */

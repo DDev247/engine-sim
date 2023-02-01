@@ -30,6 +30,8 @@ public:
 
 	double spool;
 	double spoolSpin;
+
+	// constants
 	const double spoolBoostMult = 0.00001;
 	//const double spoolBoostMult = 0.0;
 	const double spoolMult = 100;

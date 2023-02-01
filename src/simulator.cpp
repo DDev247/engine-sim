@@ -402,7 +402,7 @@ bool Simulator::simulateStep() {
     const int intakeCount = m_engine->getIntakeCount();
     const double fluidTimestep = timestep / m_fluidSimulationSteps;
 
-    const bool procharger = false;
+    const bool supercharger = false;
     m_turbocharger.throttle = (m_engine->getThrottle() * -1) + 1;
 
     for (int i = 0; i < m_fluidSimulationSteps; ++i) {
@@ -410,8 +410,8 @@ bool Simulator::simulateStep() {
             m_engine->getExhaustSystem(j)->process(fluidTimestep);
 
             // CHANGES HERE
-            if(procharger)
-                m_procharger.AddWhoosh(m_engine->getRpm());
+            if(supercharger)
+                m_supercharger.AddWhoosh(m_engine->getRpm());
             else
                 m_turbocharger.AddWhoosh(m_engine->getExhaustSystem(j)->getFlow());
         }
@@ -424,11 +424,11 @@ bool Simulator::simulateStep() {
             double powah;
             double press;
 
-            if (procharger)
+            if (supercharger)
             {
                 // PROCHARGER
-                powah = m_procharger.AddMoPowahBaby();
-                press = m_procharger.AddPress();
+                powah = m_supercharger.AddMoPowahBaby();
+                press = m_supercharger.AddPress();
             }
             else
             {
@@ -448,8 +448,8 @@ bool Simulator::simulateStep() {
 
     if (iter == 100)
     {
-        if(procharger)
-            m_procharger.CurrentWhoosh();
+        if(supercharger)
+            m_supercharger.CurrentWhoosh();
         else
             m_turbocharger.Log();
 
@@ -468,19 +468,30 @@ bool Simulator::simulateStep() {
 
     if (antilagOn)
     {
-        if (!procharger)
+        if (m_engine->getRpm() >= 5500)
         {
-            if (m_turbocharger.spool < m_turbocharger.wastegateTrigger)
+            if (supercharger)
             {
-                m_turbocharger.spool += m_turbocharger.antilagBoost;
-                // retard the timing cuz why not
                 m_engine->getIgnitionModule()->retardTiming = true;
             }
             else
             {
-                m_engine->getIgnitionModule()->retardTiming = false;
+                m_engine->getIgnitionModule()->retardTiming = true;
+                
+                if (m_turbocharger.spool < m_turbocharger.wastegateTrigger)
+                {
+                    m_turbocharger.spool += m_turbocharger.antilagBoost;
+                    // retard the timing cuz why not
+                }
+                else
+                {
+                    //m_engine->getIgnitionModule()->retardTiming = false;
+                }
             }
-        }            
+        }
+        else {
+            m_engine->getIgnitionModule()->retardTiming = false;
+        }
     }
     else
     {
@@ -519,7 +530,7 @@ bool Simulator::simulateStep() {
 
     im->resetIgnitionEvents();
 
-    double noise = sin(tim) * 222222;
+    double noise = sin(timestep) * 2222222;
     double sound = noise * (m_turbocharger.spool / m_turbocharger.wastegateTrigger);
     double value = *m_exhaustFlowStagingBuffer;
     value += sound;
@@ -635,6 +646,18 @@ void Simulator::writeToSynthesizer(double other) {
     m_exhaustFlowStagingBuffer = &other;
 
     m_synthesizer.writeInput(m_exhaustFlowStagingBuffer);
+    if (m_engine->getIgnitionModule()->retardTiming) {
+        backfiring = false;
+        if (iterr <= 0) {
+            const double a = (rand() % 100000) + 1234097672345;
+            //const double a = (rand() % 100000) + 12340976725;
+            m_synthesizer.writeInput(&a);
+            iterr = rand() % 2000 + 500;
+            backfiring = true;
+        }
+        iterr--;
+    }
+
     if (flutter) {
         const double sh = 234234234;
         Logger::DebugLine("stu");

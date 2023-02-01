@@ -75,7 +75,7 @@ public node chev_truck_454 {
     chevy_bbc_stock_intake intake(
         carburetor_cfm: 650.0,
         idle_flow_rate_cfm: 0.007,
-        idle_throttle_plate_position: 0.963,
+        idle_throttle_plate_position: 0.993,
         throttle_gamma: 1.5
     )
 
