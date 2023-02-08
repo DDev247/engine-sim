@@ -1,0 +1,264 @@
+import "engine_sim.mr"
+
+units units()
+constants constants()
+impulse_response_library ir_lib()
+
+label cycle(2 * 360 * units.deg)
+
+private node distributor {
+    input wires;
+    input timing_curve;
+    input rev_limit: 8000 * units.rpm;
+    alias output __out:
+        ignition_module(timing_curve: timing_curve, rev_limit: rev_limit)
+            .connect_wire(wires.wire1, (0.0/2.0) * cycle)
+            .connect_wire(wires.wire2, (1.0/2.0) * cycle);
+}
+
+private node wires {
+    output wire1: ignition_wire();
+    output wire2: ignition_wire();
+}
+
+private node lobe_profile_int {
+    alias output __out:
+        harmonic_cam_lobe(
+            duration_at_50_thou: 182 * units.deg,
+            gamma: 1.0,
+            lift: 5.5 * units.mm,
+            steps: 100
+        );
+}
+
+private node lobe_profile_exh {
+    alias output __out:
+        harmonic_cam_lobe(
+            duration_at_50_thou: 180 * units.deg,
+            gamma: 1.0,
+            lift: 5.5 * units.mm,
+            steps: 100
+        );
+}
+
+private node camshaft_builder {
+    input lobe_profile: lobe_profile_int();
+	input ex_lobe_profile: lobe_profile_exh();
+    input intake_lobe_profile: lobe_profile;
+    input exhaust_lobe_profile: ex_lobe_profile;
+    input lobe_separation: 110.0 * units.deg;
+    input intake_lobe_center: lobe_separation;
+    input exhaust_lobe_center: 110.0 * units.deg;
+    input advance: 0.0 * units.deg;
+    input base_radius: 0.6 * units.inch;
+
+    output intake_cam_0: _intake_cam_0;
+    output exhaust_cam_0: _exhaust_cam_0;
+
+    output intake_cam_1: _intake_cam_1;
+    output exhaust_cam_1: _exhaust_cam_1;
+
+    camshaft_parameters params(
+        advance: advance,
+        base_radius: base_radius
+    )
+
+    camshaft _intake_cam_0(params, lobe_profile: intake_lobe_profile)
+    camshaft _exhaust_cam_0(params, lobe_profile: exhaust_lobe_profile)
+    
+    camshaft _intake_cam_1(params, lobe_profile: exhaust_lobe_profile)
+    camshaft _exhaust_cam_1(params, lobe_profile: exhaust_lobe_profile)
+
+    label rot(2 * (360 / 2.0) * units.deg)
+    
+    label rot60(60 * units.deg)
+    label rot90(90 * units.deg)
+    label rot120(120 * units.deg)
+    label rot180(180 * units.deg)
+    label rot360(360 * units.deg)
+
+    _intake_cam_0
+        .add_lobe(rot360 + intake_lobe_center)
+
+	_exhaust_cam_0
+        .add_lobe(rot360 - exhaust_lobe_center)
+
+    _intake_cam_1
+        .add_lobe(rot360 + intake_lobe_center + 0.75 * rot)
+
+	_exhaust_cam_1
+        .add_lobe(rot360 - exhaust_lobe_center + 0.75 * rot)
+}
+
+public node kohler_ch750 {
+    alias output __out: engine;
+
+    engine engine(
+        name: "Kohler CH750 Lawnmower",
+        starter_torque: 50 * units.lb_ft,
+        starter_speed: 740 * units.rpm,
+        redline: 3600 * units.rpm
+    )
+
+    wires wires()
+
+    crankshaft c0(
+        throw: 59 * units.mm / 2,
+        flywheel_mass: 1 * units.lb,
+        mass: 1 * units.lb,
+        friction_torque: 3.0 * units.lb_ft,
+        moment_of_inertia: 0.22986844776863666 * 0.5,
+        position_x: 0.0,
+        position_y: 0.0,
+        tdc: constants.pi / 4
+    )
+
+    rod_journal rj0(angle: 0.0)
+    c0
+        .add_rod_journal(rj0)
+
+    piston_parameters piston_params(
+        mass: 250 * units.g,
+        //blowby: k_28inH2O(0.1),
+        compression_height: 1.0 * units.inch,
+        wrist_pin_position: 0.0,
+        displacement: 0.0
+    )
+
+    connecting_rod_parameters cr_params(
+        mass: 150.0 * units.g,
+        moment_of_inertia: 0.0015884918028487504,
+        center_of_mass: 0.0,
+        length: 4.5 * units.inch
+    )
+
+    cylinder_bank_parameters bank_params(
+        bore: 73 * units.mm,
+        deck_height: (4.0 + 1) * units.inch + 69 * units.mm / 2
+    )
+
+    intake intake(
+        plenum_volume: 1.0 * units.L,
+        plenum_cross_section_area: 10.0 * units.cm2,
+        intake_flow_rate: k_carb(150.0),
+        idle_flow_rate: k_carb(0.0),
+        idle_throttle_plate_position: 0.99,
+        throttle_gamma: 1.0
+    )
+
+    exhaust_system_parameters es_params(
+        outlet_flow_rate: k_carb(300.0),
+        primary_tube_length: 10.0 * units.inch,
+        primary_flow_rate: k_carb(200.0),
+        velocity_decay: 1.0,
+        volume: 20.0 * units.L
+    )
+
+    exhaust_system exhaust0(
+        es_params,
+        audio_volume: 1.0,
+        impulse_response: ir_lib.default_0
+    )
+
+    exhaust_system exhaust1(
+        es_params,
+        audio_volume: 1.0,
+        impulse_response: ir_lib.default_0
+    )
+
+    cylinder_bank b0(bank_params, angle: -30 * units.deg)
+    b0
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj0,
+            intake: intake,
+            exhaust_system: exhaust0,
+            ignition_wire: wires.wire1
+        )
+
+    cylinder_bank b1(bank_params, angle: 30 * units.deg)
+    b1
+        .add_cylinder(
+            piston: piston(piston_params, blowby: k_28inH2O(0.1)),
+            connecting_rod: connecting_rod(cr_params),
+            rod_journal: rj0,
+            intake: intake,
+            exhaust_system: exhaust1,
+            ignition_wire: wires.wire2
+        )
+
+    engine
+        .add_cylinder_bank(b0)
+        .add_cylinder_bank(b1)
+
+    engine.add_crankshaft(c0)
+
+    camshaft_builder camshaft(
+        lobe_separation: 114 * units.deg,
+        base_radius: 500 * units.thou
+    )
+
+    b0.set_cylinder_head (
+        generic_small_engine_head(
+            chamber_volume: 50 * units.cc,
+            intake_camshaft: camshaft.intake_cam_0,
+            exhaust_camshaft: camshaft.exhaust_cam_0
+        )
+    )
+    b1.set_cylinder_head (
+        generic_small_engine_head(
+            chamber_volume: 50 * units.cc,
+            intake_camshaft: camshaft.intake_cam_1,
+            exhaust_camshaft: camshaft.exhaust_cam_1
+        )
+    )
+
+    function timing_curve(1000 * units.rpm)
+    timing_curve
+        .add_sample(0000 * units.rpm, 50 * units.deg)
+        .add_sample(1000 * units.rpm, 50 * units.deg)
+        .add_sample(2000 * units.rpm, 50 * units.deg)
+        .add_sample(3000 * units.rpm, 50 * units.deg)
+        .add_sample(4000 * units.rpm, 50 * units.deg)
+
+    engine.add_ignition_module(
+        distributor(
+            wires: wires,
+            timing_curve: timing_curve,
+            rev_limit: 5000 * units.rpm
+        ))
+}
+
+label car_mass(2700 * units.lb)
+
+private node impreza {
+    alias output __out:
+        vehicle(
+            mass: car_mass,
+            drag_coefficient: 0.3,
+            cross_sectional_area: (72 * units.inch) * (56 * units.inch),
+            diff_ratio: 3.9,
+            tire_radius: 10 * units.inch,
+            rolling_resistance: 0.015 * car_mass * 9.81 
+        );
+}
+
+private node impreza_transmission {
+    alias output __out:
+        transmission(
+            max_clutch_torque: 300 * units.lb_ft
+        )
+        .add_gear(3.636)
+        .add_gear(2.375)
+        .add_gear(1.761)
+        .add_gear(1.346)
+        .add_gear(0.971)
+        .add_gear(0.756);
+}
+
+public node main {
+    set_engine(kohler_ch750())
+    set_vehicle(impreza())
+    set_transmission(impreza_transmission())
+}
