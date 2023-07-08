@@ -41,6 +41,30 @@ class IgnitionModule : public Part {
 
         bool m_enabled;
 
+        bool m_2stepEnabled = false;
+        double m_2stepSoftCutLimit = 4000;
+        double m_2stepSoftCutAngle = -20;
+        double m_2stepHardCutLimit = 5000;
+        
+        bool m_3stepEnabled = false;
+        double m_3stepSoftCutLimit = 5500;
+        double m_3stepSoftCutAngle = -20;
+
+        bool m_launchingSoft = false;
+        bool m_launchingHard = false;
+
+        double m_lastCrankshaftAngle;
+        double m_revLimit;
+        double m_revLimitTimer;
+        double m_limiterDuration;
+
+        double m_currentTableValue = 30;
+        double m_retardAmount = 0;
+        // set this to true to have absolute timing retard
+        // set this to false to have relative timing retard
+        bool m_retard = false;
+        bool m_limiter = false;
+
     protected:
         SparkPlug *getPlug(int i);
 
@@ -48,11 +72,6 @@ class IgnitionModule : public Part {
         SparkPlug *m_plugs;
         Crankshaft *m_crankshaft;
         int m_cylinderCount;
-
-        double m_lastCrankshaftAngle;
-        double m_revLimit;
-        double m_revLimitTimer;
-        double m_limiterDuration;
 };
 
 #endif /* ATG_ENGINE_SIM_IGNITION_MODULE_H */

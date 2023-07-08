@@ -24,9 +24,9 @@
 #include "../discord/Discord.h"
 #endif
 
-std::string EngineSimApplication::s_buildVersion = "0.1.12a";
+std::string EngineSimApplication::s_buildVersion = "0.1.12a EFI 0.1";
 
-EngineSimApplication::EngineSimApplication() {
+EngineSimApplication::EngineSimApplication() : tscpp("COM3", 115200) {
     m_assetPath = "";
 
     m_geometryVertexBuffer = nullptr;
@@ -82,6 +82,7 @@ EngineSimApplication::EngineSimApplication() {
     m_viewParameters.Layer1 = 0;
 
     m_displayAngle = 0.0f;
+
 }
 
 EngineSimApplication::~EngineSimApplication() {
@@ -363,7 +364,7 @@ void EngineSimApplication::run() {
 
         if (m_engine.ProcessKeyDown(ysKey::Code::Tab)) {
             m_screen++;
-            if (m_screen > 2) m_screen = 0;
+            if (m_screen > 3) m_screen = 0;
         }
 
         if (m_engine.ProcessKeyDown(ysKey::Code::F)) {
@@ -400,7 +401,13 @@ void EngineSimApplication::run() {
         }
 
         if (!m_paused || m_engine.ProcessKeyDown(ysKey::Code::Right)) {
+            // calculate ECM
+            ecmProcess(m_engine.GetFrameLength());
+            
             process(m_engine.GetFrameLength());
+            
+            // set TSCpp status
+            ecmStatus();
         }
 
         m_uiManager.update(m_engine.GetFrameLength());
@@ -419,6 +426,7 @@ void EngineSimApplication::run() {
     }
 
     m_simulator->endAudioRenderingThread();
+    tscpp.StopThreads();
 }
 
 void EngineSimApplication::destroy() {
@@ -432,6 +440,127 @@ void EngineSimApplication::destroy() {
 
     m_simulator->destroy();
     m_audioBuffer.destroy();
+}
+
+void EngineSimApplication::ecmProcess(float dt) {
+    // replace by config value & config trigger value & config tps value
+    float tps = 1 - m_iceEngine->getThrottle();
+
+    if (currentStatus.clutchEngagedRPM < (configPage6.flatSArm * 100) && m_targetClutchPressure <= 0.0 && tps >= (configPage10.lnchCtrlTPS / 255) && configPage6.launchEnabled) {
+        m_iceEngine->getIgnitionModule()->m_2stepSoftCutAngle = configPage6.lnchRetard;
+        m_iceEngine->getIgnitionModule()->m_2stepSoftCutLimit = configPage6.lnchSoftLim * 100;
+        m_iceEngine->getIgnitionModule()->m_2stepHardCutLimit = configPage6.lnchHardLim * 100;
+        m_iceEngine->getIgnitionModule()->m_2stepEnabled = true;
+    }
+    else if (currentStatus.clutchEngagedRPM > (configPage6.flatSArm * 100) && m_targetClutchPressure <= 0.0 && configPage6.flatSEnable) {
+        m_iceEngine->getIgnitionModule()->m_3stepSoftCutAngle = configPage6.flatSRetard;
+        m_iceEngine->getIgnitionModule()->m_3stepSoftCutLimit = configPage6.flatSSoftWin;
+        m_iceEngine->getIgnitionModule()->m_3stepEnabled = true;
+    }
+    else {
+        m_iceEngine->getIgnitionModule()->m_2stepEnabled = false;
+        m_iceEngine->getIgnitionModule()->m_3stepEnabled = false;
+        m_iceEngine->getIgnitionModule()->m_retard = false;
+        m_iceEngine->getIgnitionModule()->m_retardAmount = 0;
+    }
+
+    if (units::rpm(m_iceEngine->getRpm()) > configPage4.SoftRevLim * 10) {
+        m_iceEngine->getIgnitionModule()->m_retard = true;
+        m_iceEngine->getIgnitionModule()->m_retardAmount = -configPage4.SoftLimRetard;
+        if (units::rpm(m_iceEngine->getRpm()) > configPage4.HardRevLim * 10) {
+            m_iceEngine->getIgnitionModule()->m_revLimitTimer = 1;
+            m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
+        }
+        m_iceEngine->getIgnitionModule()->m_limiter = true;
+    }
+    else if (units::rpm(m_iceEngine->getRpm()) > configPage4.HardRevLim * 10) {
+        m_iceEngine->getIgnitionModule()->m_retard = true;
+        m_iceEngine->getIgnitionModule()->m_retardAmount = -configPage4.SoftLimRetard;
+        m_iceEngine->getIgnitionModule()->m_revLimitTimer = 1;
+        m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
+        m_iceEngine->getIgnitionModule()->m_limiter = true;
+    }
+    else {
+        if (!m_iceEngine->getIgnitionModule()->m_2stepEnabled && !m_iceEngine->getIgnitionModule()->m_3stepEnabled) {
+            m_iceEngine->getIgnitionModule()->m_retard = false;
+            m_iceEngine->getIgnitionModule()->m_retardAmount = 0;
+            m_iceEngine->getIgnitionModule()->m_revLimitTimer = 0;
+        }
+        // disable stock rev limiter
+        m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
+        m_iceEngine->getIgnitionModule()->m_limiter = false;
+    }
+
+    //std::stringstream ss;
+    //ss << m_iceEngine->getIgnitionModule()->m_revLimitTimer << ":" << m_iceEngine->getIgnitionModule()->m_limiter << " : " << m_iceEngine->getIgnitionModule()->m_retardAmount << ":" << m_iceEngine->getIgnitionModule()->m_retard << " : " << m_iceEngine->getIgnitionModule()->m_currentTableValue;
+    //m_infoCluster->setLogMessage(ss.str());
+
+    if(m_simulator->m_starterMotor.m_enabled && currentStatus.RPM < m_simulator->m_starterMotor.m_rotationSpeed)
+        BIT_SET(currentStatus.engine, BIT_ENGINE_CRANK);
+    else
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_CRANK);
+
+    if(currentStatus.RPM > 200 && !m_simulator->m_starterMotor.m_enabled)
+        BIT_SET(currentStatus.engine, BIT_ENGINE_RUN);
+    else
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_RUN);
+
+    //int load = (m_iceEngine->getManifoldPressure() * 100) / 102000;
+    int ign = get3DTableValue(&ignitionTable, currentStatus.ignLoad, currentStatus.RPM);
+    int fuel = get3DTableValue(&fuelTable, currentStatus.fuelLoad, currentStatus.RPM);
+    m_iceEngine->getIgnitionModule()->m_currentTableValue = ign - 40;
+    
+    for (int i = 0; i < m_iceEngine->getIntakeCount(); i++) {
+        m_iceEngine->getIntake(i)->m_fuelInjectAmount = fuel * (9 * 1.25);
+    }
+}
+
+void EngineSimApplication::ecmStatus() {
+    long prevRPM = currentStatus.longRPM;
+    currentStatus.rpmDOT = m_iceEngine->getRpm() - prevRPM;
+    currentStatus.longRPM = m_iceEngine->getRpm();
+    currentStatus.RPM = currentStatus.longRPM;
+    currentStatus.RPMdiv100 = currentStatus.longRPM / 100;
+
+    float tps = 1 - m_iceEngine->getThrottle();
+    currentStatus.TPSlast = currentStatus.TPS;
+    currentStatus.TPS = std::round(200.0 * tps);
+    currentStatus.tpsADC = std::round(255.0 * tps);
+
+    currentStatus.MAP = (m_iceEngine->getManifoldPressure() * 100) / 102000;
+    currentStatus.ignLoad = currentStatus.MAP;
+    currentStatus.fuelLoad = currentStatus.MAP;
+
+    currentStatus.VE = m_iceEngine->getIntake(0)->m_fuelInjectAmount / (9 * 1.25);
+
+    float rpmRed = (units::rpm(m_iceEngine->getRpm()) / m_iceEngine->getRedline());
+    //tscpp.currentStatus.battery10 = ((units::rpm(m_iceEngine->getRpm()) / m_iceEngine->getRedline()) * 44) + 124;
+    currentStatus.battery10 = (rpmRed * 24) + 124;
+
+    currentStatus.advance = (m_iceEngine->getIgnitionModule()->getTimingAdvance() / units::deg) * (m_iceEngine->getStarterSpeed() < 0 ? -1 : 1);
+    currentStatus.advance1 = currentStatus.advance;
+    currentStatus.advance2 = currentStatus.advance;
+    currentStatus.launchingHard = m_iceEngine->getIgnitionModule()->m_launchingHard;
+    currentStatus.launchingSoft = m_iceEngine->getIgnitionModule()->m_launchingSoft;
+    currentStatus.gear = m_transmission->getGear() + 1;
+    currentStatus.vss = m_vehicle->getSpeed() / (units::km / units::hour);
+    currentStatus.coolant = 127;
+    currentStatus.IAT = 50;
+    currentStatus.fuelPumpOn = m_iceEngine->getIgnitionModule()->m_enabled;
+    currentStatus.O2 = 255;
+    currentStatus.O2ADC = 255;
+    currentStatus.nitrous_status = false;
+
+    currentStatus.CTPSActive = 0;
+    currentStatus.EMAP = 0;
+    currentStatus.EMAPADC = 0;
+    currentStatus.baro = 100;
+    currentStatus.afrTarget = 147;
+    currentStatus.nitrous_status = 0;
+    currentStatus.nSquirts = 4;
+    currentStatus.nChannels = m_iceEngine->getCylinderCount();
+    currentStatus.hasSync = true;
+    currentStatus.syncLossCounter = 0;
 }
 
 void EngineSimApplication::loadEngine(
@@ -906,6 +1035,9 @@ void EngineSimApplication::processEngineInput() {
         m_targetClutchPressure += 0.2 * dt;
     }
     else if (m_engine.IsKeyDown(ysKey::Code::Shift)) {
+        if(m_targetClutchPressure != 0.0)
+            currentStatus.clutchEngagedRPM = currentStatus.RPM;
+
         m_targetClutchPressure = 0.0;
         m_infoCluster->setLogMessage("CLUTCH DEPRESSED");
     }
@@ -1008,6 +1140,26 @@ void EngineSimApplication::renderScene() {
         m_loadSimulationCluster->setVisible(false);
         m_mixerCluster->setVisible(false);
         m_infoCluster->setVisible(false);
+    }
+    else if (m_screen == 3) {
+        Bounds windowBounds((float)screenWidth, (float)screenHeight, { 0, (float)screenHeight });
+        const Bounds top = windowBounds.verticalSplit(0.75f, 1.0f);
+        const Bounds bottom = windowBounds.verticalSplit(0.0f, 0.75f);
+        m_engineView->setDrawFrame(false);
+        //m_engineView->setBounds(grid.get(windowBounds, 0, 0, 2, 1));
+        //m_engineView->setLocalPosition({ 0, 0 });
+        m_engineView->activate();
+
+        m_infoCluster->m_bounds = top;
+        m_rightGaugeCluster->m_bounds = bottom;
+
+        m_engineView->setVisible(false);
+        m_rightGaugeCluster->setVisible(true);
+        m_oscCluster->setVisible(false);
+        m_performanceCluster->setVisible(false);
+        m_loadSimulationCluster->setVisible(false);
+        m_mixerCluster->setVisible(false);
+        m_infoCluster->setVisible(true);
     }
 
     const float cameraAspectRatio =

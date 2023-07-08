@@ -53,7 +53,7 @@ void IgnitionModule::reset() {
 void IgnitionModule::update(double dt) {
     const double cycleAngle = m_crankshaft->getCycleAngle();
 
-    if (m_enabled && m_revLimitTimer == 0) {
+    if (m_enabled && m_revLimitTimer <= 0) {
         const double fourPi = 4 * constants::pi;
         const double advance = getTimingAdvance();
 
@@ -85,13 +85,48 @@ void IgnitionModule::update(double dt) {
         }
     }
 
+
     m_revLimitTimer -= dt;
+    /*m_revLimitTimer -= dt;
     if (std::fabs(m_crankshaft->m_body.v_theta) > m_revLimit) {
         m_revLimitTimer = m_limiterDuration;
     }
+    */
 
     if (m_revLimitTimer < 0) {
         m_revLimitTimer = 0;
+    }
+
+    if (std::fabs(m_crankshaft->m_body.v_theta) > units::rpm(m_2stepSoftCutLimit) && m_2stepEnabled) {
+        m_retard = true;
+        m_retardAmount = m_2stepSoftCutAngle;
+        m_revLimitTimer = 0.05;
+        m_launchingSoft = true;
+    }
+    else if (m_revLimitTimer <= 0) {
+        if (!m_limiter) {
+            m_retard = false;
+            m_retardAmount = 0;
+        }
+        m_launchingSoft = false;
+        m_launchingHard = false;
+    }
+
+    if (std::fabs(m_crankshaft->m_body.v_theta) > units::rpm(m_2stepHardCutLimit) && m_2stepEnabled) {
+        m_revLimitTimer = 0.1;
+        m_launchingHard = true;
+    }
+
+    if (std::fabs(m_crankshaft->m_body.v_theta) > units::rpm(m_3stepSoftCutLimit) && m_3stepEnabled) {
+        m_retard = true;
+        m_retardAmount = m_3stepSoftCutAngle;
+        m_revLimitTimer = 0.05;
+    }
+    else if (m_revLimitTimer <= 0) {
+        if (!m_limiter) {
+            m_retard = false;
+            m_retardAmount = 0;
+        }
     }
 
     m_lastCrankshaftAngle = cycleAngle;
@@ -108,7 +143,12 @@ void IgnitionModule::resetIgnitionEvents() {
 }
 
 double IgnitionModule::getTimingAdvance() {
-    return m_timingCurve->sampleTriangle(-m_crankshaft->m_body.v_theta);
+    if (m_retard) {
+        return (m_retardAmount * units::deg);
+    }
+    else {
+        return (m_currentTableValue * units::deg) - (m_retardAmount * units::deg);
+    }
 }
 
 IgnitionModule::SparkPlug *IgnitionModule::getPlug(int i) {

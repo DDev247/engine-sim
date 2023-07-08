@@ -5,6 +5,7 @@
 
 #include "gas_system.h"
 
+class Engine;
 class Intake : public Part {
     public:
         struct Parameters {
@@ -45,6 +46,8 @@ class Intake : public Part {
 
         void process(double dt);
 
+        void setEngine(Engine* engine) { m_engine = engine; }
+
         inline double getRunnerFlowRate() const { return m_runnerFlowRate; }
         inline double getThrottlePlatePosition() const { return m_idleThrottlePlatePosition * m_throttle; }
         inline double getRunnerLength() const { return m_runnerLength; }
@@ -58,6 +61,8 @@ class Intake : public Part {
         double m_flowRate;
         double m_totalFuelInjected;
 
+        double m_fuelInjectAmount = 900;
+
     protected:
         double m_crossSectionArea;
         double m_inputFlowK;
@@ -69,6 +74,8 @@ class Intake : public Part {
         double m_velocityDecay;
 
         GasSystem m_atmosphere;
+
+        Engine* m_engine;
 };
 
 #endif /* ATG_ENGINE_SIM_INTAKE_H */

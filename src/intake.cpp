@@ -1,6 +1,7 @@
 #include "../include/intake.h"
 
 #include "../include/units.h"
+#include "../include/engine.h"
 
 #include <cmath>
 
@@ -63,16 +64,17 @@ void Intake::process(double dt) {
 
     const double p_air = ideal_afr / (1 + ideal_afr);
     GasSystem::Mix fuelAirMix;
-    fuelAirMix.p_fuel = 1 - p_air;
+    //fuelAirMix.p_fuel = 1 - p_air;
+    fuelAirMix.p_fuel = 0;
     fuelAirMix.p_inert = p_air * 0.75;
     fuelAirMix.p_o2 = p_air * 0.25;
 
-    const double idle_afr = 2.0;
+    /*const double idle_afr = 2.0;
     const double p_idle_air = idle_afr / (1 + idle_afr);
     GasSystem::Mix fuelMix;
     fuelMix.p_fuel = (1.0 - p_idle_air);
     fuelMix.p_inert = p_idle_air * 0.75;
-    fuelMix.p_o2 = p_idle_air * 0.25;
+    fuelMix.p_o2 = p_idle_air * 0.25;*/
 
     const double throttle = getThrottlePlatePosition();
     const double flowAttenuation = std::cos(throttle * constants::pi / 2);
@@ -85,16 +87,20 @@ void Intake::process(double dt) {
     flowParams.dt = dt;
 
     m_atmosphere.reset(units::pressure(1.0, units::atm), units::celcius(25.0), fuelAirMix);
+    m_atmosphere.injectFuel(m_fuelInjectAmount);
+
     flowParams.system_0 = &m_atmosphere;
     flowParams.system_1 = &m_system;
     flowParams.k_flow = flowAttenuation * m_inputFlowK;
     m_flow = m_system.flow(flowParams);
 
+    /*
     m_atmosphere.reset(units::pressure(1.0, units::atm), units::celcius(25.0), fuelMix);
     flowParams.system_0 = &m_atmosphere;
     flowParams.system_1 = &m_system;
     flowParams.k_flow = m_idleFlowK;
-    const double idleCircuitFlow = m_system.flow(flowParams);
+    const double idleCircuitFlow = m_system.flow(flowParams);*/
+    const double idleCircuitFlow = 0;
 
     m_system.dissipateExcessVelocity();
     m_system.updateVelocity(dt, m_velocityDecay);
@@ -103,7 +109,7 @@ void Intake::process(double dt) {
         m_totalFuelInjected += fuelAirMix.p_fuel * m_flow;
     }
 
-    if (idleCircuitFlow > 0) {
+    /*if (idleCircuitFlow > 0) {
         m_totalFuelInjected += fuelMix.p_fuel * idleCircuitFlow;
-    }
+    }*/
 }

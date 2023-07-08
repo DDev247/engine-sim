@@ -28,6 +28,8 @@
 
 #include <vector>
 
+#include <TSCpp/TSCpp/include/tscpp.h>
+
 class EngineSimApplication {
     private:
         static std::string s_buildVersion;
@@ -87,6 +89,10 @@ class EngineSimApplication {
         Simulator *getSimulator() { return m_simulator; }
         InfoCluster *getInfoCluster() { return m_infoCluster; }
         ApplicationSettings* getAppSettings() { return &m_applicationSettings; }
+
+        TSCpp tscpp;
+        void ecmStatus();
+        void ecmProcess(float dt);
 
     protected:
         void loadScript();

@@ -85,6 +85,10 @@ void Engine::initialize(const Parameters &params) {
         m_exhaustSystems[i].m_index = i;
     }
 
+    for (int i = 0; i < m_intakeCount; ++i) {
+        m_intakes[i].setEngine(this);
+    }
+
     for (int i = 0; i < m_cylinderCount; ++i) {
         m_combustionChambers[i].setEngine(this);
     }

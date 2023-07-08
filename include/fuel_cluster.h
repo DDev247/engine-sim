@@ -5,6 +5,7 @@
 
 #include "engine.h"
 #include "simulator.h"
+#include "labeled_gauge.h"
 
 class FuelCluster : public UiElement {
     public:
@@ -20,8 +21,12 @@ class FuelCluster : public UiElement {
         Engine *m_engine;
         Simulator *m_simulator;
 
+
     private:
         double getTotalVolumeFuelConsumed() const;
+
+        LabeledGauge* m_pulseWidthGauge;
+        LabeledGauge* m_sparkAdvanceGauge;
 };
 
 #endif /* ATG_ENGINE_SIM_FUEL_CLUSTER_H */

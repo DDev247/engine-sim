@@ -125,6 +125,12 @@ void CylinderHeadObject::render(const ViewParameters *view) {
         m_app->getShaders()->GetRegularFlags(),
         m_app->getAssetManager()->GetModelAsset("CylinderHead"),
         0x0);
+    bool flipInjector = m_head->getFlipDisplay();
+    //bool flipInjector = false;
+    m_app->getEngine()->DrawModel(
+        m_app->getShaders()->GetRegularFlags(),
+        flipInjector ? m_app->getAssetManager()->GetModelAsset("InjectorFlipped") : m_app->getAssetManager()->GetModelAsset("Injector"),
+        0x0);
     m_app->getShaders()->SetObjectTransform(T_head);
     m_app->getShaders()->SetBaseColor(m_app->getBackgroundColor());
     m_app->drawGenerated(valveShadow, 0x1);

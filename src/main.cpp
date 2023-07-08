@@ -12,6 +12,11 @@ int WINAPI WinMain(
     (void)lpCmdLine;
     (void)hPrevInstance;
 
+    AllocConsole();
+    freopen("CONIN$", "r", stdin);
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+
     EngineSimApplication application;
     application.initialize((void *)&hInstance, ysContextObject::DeviceAPI::DirectX11);
     application.run();

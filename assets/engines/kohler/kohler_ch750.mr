@@ -151,3 +151,31 @@ public node kohler_ch750 {
             rev_limit: 5000 * units.rpm
         ))
 }
+
+private node direct_drive {
+    alias output __out: transmission;
+
+    transmission transmission(
+        max_clutch_torque: 35 * units.lb_ft
+    )
+
+    transmission.add_gear(1.0)
+}
+
+private node static_load {
+    alias output __out:
+        vehicle(
+            mass: 563 * units.lb,
+            drag_coefficient: 0.1,
+            cross_sectional_area: (20 * units.inch) * (47 * units.inch),
+            diff_ratio: 2.353,
+            tire_radius: 8.5 * units.inch,
+            rolling_resistance: 10000 * units.N
+        );
+}
+
+public node main {
+    set_engine(kohler_ch750())
+    set_transmission(direct_drive())
+    set_vehicle(static_load())
+}
