@@ -24,7 +24,7 @@
 #include "../discord/Discord.h"
 #endif
 
-std::string EngineSimApplication::s_buildVersion = "0.1.12a EFI 0.1";
+std::string EngineSimApplication::s_buildVersion = "0.1.12a EFI 0.2";
 
 EngineSimApplication::EngineSimApplication() : tscpp("COM3", 115200) {
     m_assetPath = "";
