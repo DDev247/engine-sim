@@ -1,9 +1,8 @@
-# Engine Simulator
+# EFI Engine Simulator
 ![Alt text](docs/public/screenshots/screenshot_v01.png?raw=true)
 ---
-# Engine Simulator has moved!
-
-To get the newest releases of the game, [click here](https://github.com/Engine-Simulator/engine-sim-community-edition).
+# Looking for the turbocharged version?
+To get the latest turbo release [click here](https://github.com/DDev247/engine-sim/releases/tag/v0.1.10a_turbo2).
 ---
 
 ## What is this?
