@@ -154,7 +154,7 @@ add_library(engine-sim STATIC
     include/vehicle.h
     include/vehicle_drag_constraint.h
     include/vtec_valvetrain.h
-)
+ "src/turbocharger.cpp" "include/turbocharger.h")
 
 target_link_libraries(engine-sim
     simple-2d-constraint-solver
@@ -294,7 +294,7 @@ add_executable(engine-sim-app WIN32
     include/load_simulation_cluster.h
     include/mixer_cluster.h
     include/info_cluster.h
-)
+ "src/logging_cluster.cpp" "include/logging_cluster.h")
 
 target_link_libraries(engine-sim-app
     engine-sim

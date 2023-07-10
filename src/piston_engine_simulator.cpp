@@ -289,6 +289,9 @@ void PistonEngineSimulator::simulateStep_() {
     for (int i = 0; i < cylinderCount; ++i) {
         if (im->getIgnitionEvent(i)) {
             m_engine->getChamber(i)->ignite();
+            // Add some temperature?
+            if(m_engine->getChamber(i)->m_system.n_fuel() > 0)
+                m_blockTemperature += 0.0125f * (1 - m_engine->getThrottle() + 0.25f);
         }
 
         m_engine->getChamber(i)->update(timestep);
@@ -316,6 +319,22 @@ void PistonEngineSimulator::simulateStep_() {
             m_engine->getChamber(j)->flow(fluidTimestep);
         }
     }
+
+    // simulate air cooling?
+    m_blockTemperature -= 0.075f * timestep;
+    //m_blockTemperature -= (0.1f * (units::toRpm(m_engine->getRpm()) / 1000)) * timestep;
+    m_blockTemperature -= 0.02f * timestep;
+
+    if (m_blockTemperature >= 80) {
+        // simulate a coolant valve thing
+        m_blockTemperature -= (0.085f * (units::toRpm(m_engine->getRpm()) / 5000)) * timestep;
+    }
+    else if (m_blockTemperature <= 24) {
+        m_blockTemperature = 24;
+    }
+    
+    float f = 2 * timestep;
+    m_coolantTemperature = m_coolantTemperature * (1.0 - f) + (m_blockTemperature * f);
 
     im->resetIgnitionEvents();
 }

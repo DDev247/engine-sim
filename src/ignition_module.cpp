@@ -70,6 +70,7 @@ void IgnitionModule::update(double dt) {
 
                 if (adjustedAngle >= r0 && adjustedAngle < r1) {
                     m_plugs[i].ignitionEvent = m_plugs[i].enabled;
+                    m_ignitionCount++;
                 }
             }
             else {
@@ -80,6 +81,7 @@ void IgnitionModule::update(double dt) {
 
                 if (adjustedAngle >= r1 && adjustedAngle < r0) {
                     m_plugs[i].ignitionEvent = m_plugs[i].enabled;
+                    m_ignitionCount++;
                 }
             }
         }
@@ -100,7 +102,7 @@ void IgnitionModule::update(double dt) {
     if (std::fabs(m_crankshaft->m_body.v_theta) > units::rpm(m_2stepSoftCutLimit) && m_2stepEnabled) {
         m_retard = true;
         m_retardAmount = m_2stepSoftCutAngle;
-        m_revLimitTimer = 0.05;
+        //m_revLimitTimer = 0.05;
         m_launchingSoft = true;
     }
     else if (m_revLimitTimer <= 0) {
@@ -121,12 +123,14 @@ void IgnitionModule::update(double dt) {
         m_retard = true;
         m_retardAmount = m_3stepSoftCutAngle;
         m_revLimitTimer = 0.05;
+        m_shiftingHard = true;
     }
     else if (m_revLimitTimer <= 0) {
         if (!m_limiter) {
             m_retard = false;
             m_retardAmount = 0;
         }
+        m_shiftingHard = false;
     }
 
     m_lastCrankshaftAngle = cycleAngle;

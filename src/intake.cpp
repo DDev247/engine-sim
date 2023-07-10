@@ -86,12 +86,12 @@ void Intake::process(double dt) {
     flowParams.direction_y = -1.0;
     flowParams.dt = dt;
 
-    m_atmosphere.reset(units::pressure(1.0, units::atm), units::celcius(25.0), fuelAirMix);
+    m_atmosphere.reset(units::pressure(1.0, units::atm) + units::pressure(m_boost, units::mbar), units::celcius(25.0), fuelAirMix);
     m_atmosphere.injectFuel(m_fuelInjectAmount);
 
     flowParams.system_0 = &m_atmosphere;
     flowParams.system_1 = &m_system;
-    flowParams.k_flow = flowAttenuation * m_inputFlowK;
+    flowParams.k_flow = flowAttenuation * m_inputFlowK + m_additionalFlow;
     m_flow = m_system.flow(flowParams);
 
     /*

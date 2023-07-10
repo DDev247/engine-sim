@@ -63,6 +63,10 @@ class Intake : public Part {
 
         double m_fuelInjectAmount = 900;
 
+        // In mBar.
+        double m_boost = 0.0;
+        double m_additionalFlow = 0.0;
+
     protected:
         double m_crossSectionArea;
         double m_inputFlowK;

@@ -28,6 +28,8 @@
 
 #include <vector>
 
+#include "logging_cluster.h"
+
 #include <TSCpp/TSCpp/include/tscpp.h>
 
 class EngineSimApplication {
@@ -91,8 +93,10 @@ class EngineSimApplication {
         ApplicationSettings* getAppSettings() { return &m_applicationSettings; }
 
         TSCpp tscpp;
-        void ecmStatus();
+        void ecmStatus(float dt);
         void ecmProcess(float dt);
+
+        uint32_t fuelCorrections(float dt);
 
     protected:
         void loadScript();
@@ -154,6 +158,8 @@ class EngineSimApplication {
         MixerCluster *m_mixerCluster;
         InfoCluster *m_infoCluster;
         SimulationObject::ViewParameters m_viewParameters;
+
+        LoggingCluster* m_loggingCluster;
 
         bool m_paused;
 

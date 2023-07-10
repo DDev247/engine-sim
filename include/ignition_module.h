@@ -53,6 +53,8 @@ class IgnitionModule : public Part {
         bool m_launchingSoft = false;
         bool m_launchingHard = false;
 
+        bool m_shiftingHard = false;
+
         double m_lastCrankshaftAngle;
         double m_revLimit;
         double m_revLimitTimer;
@@ -65,6 +67,8 @@ class IgnitionModule : public Part {
         bool m_retard = false;
         bool m_limiter = false;
 
+        uint32_t m_ignitionCount;
+        
     protected:
         SparkPlug *getPlug(int i);
 

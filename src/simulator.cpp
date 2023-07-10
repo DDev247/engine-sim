@@ -52,6 +52,7 @@ void Simulator::loadSimulation(Engine *engine, Vehicle *vehicle, Transmission *t
     m_engine = engine;
     m_vehicle = vehicle;
     m_transmission = transmission;
+    m_turbo.SetEngine(engine);
 }
 
 void Simulator::releaseSimulation() {
@@ -103,7 +104,9 @@ bool Simulator::simulateStep() {
         return false;
     }
 
+
     const double timestep = getTimestep();
+    m_turbo.process(timestep);
     m_system->process(timestep, 1);
 
     m_engine->update(timestep);

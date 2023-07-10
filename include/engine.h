@@ -44,6 +44,10 @@ class Engine : public Part {
             double initialHighFrequencyGain;
             double initialNoise;
             double initialJitter;
+
+            double blockCool;
+            double blockCoolRadiator;
+            double blockFireTemp;
         };
 
     public:

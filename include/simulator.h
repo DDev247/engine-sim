@@ -11,6 +11,7 @@
 #include "vehicle_drag_constraint.h"
 #include "delay_filter.h"
 #include "engine.h"
+#include "turbocharger.h"
 
 #include <chrono>
 
@@ -77,8 +78,13 @@ public:
 
     double filteredEngineSpeed() const { return m_filteredEngineSpeed; }
 
+    double getTemperature() const { return m_blockTemperature; }
+    double getCoolantTemperature() const { return m_coolantTemperature; }
+
     Dynamometer m_dyno;
     StarterMotor m_starterMotor;
+
+    TurboCharger m_turbo;
 
 protected:
     void initializeSynthesizer();
@@ -86,6 +92,9 @@ protected:
     virtual void writeToSynthesizer() = 0;
 
     atg_scs::RigidBodySystem *m_system;
+
+    double m_blockTemperature = 24;
+    double m_coolantTemperature = 24;
 
 private:
     void updateFilteredEngineSpeed(double dt);

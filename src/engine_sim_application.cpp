@@ -364,7 +364,7 @@ void EngineSimApplication::run() {
 
         if (m_engine.ProcessKeyDown(ysKey::Code::Tab)) {
             m_screen++;
-            if (m_screen > 3) m_screen = 0;
+            if (m_screen > 5) m_screen = 0;
         }
 
         if (m_engine.ProcessKeyDown(ysKey::Code::F)) {
@@ -407,7 +407,7 @@ void EngineSimApplication::run() {
             process(m_engine.GetFrameLength());
             
             // set TSCpp status
-            ecmStatus();
+            ecmStatus(m_engine.GetFrameLength());
         }
 
         m_uiManager.update(m_engine.GetFrameLength());
@@ -442,9 +442,729 @@ void EngineSimApplication::destroy() {
     m_audioBuffer.destroy();
 }
 
+float runtime;
+bool countRuntime;
+
+float MAPlast = 0;
+
+/*byte correctionWUE(float dt) {
+    byte WUEValue;
+    if (currentStatus.coolant > (table2D_getAxisValue(&WUETable, 9) - CALIBRATION_TEMPERATURE_OFFSET)) {
+        //This prevents us doing the 2D lookup if we're already up to temp
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_WARMUP);
+        WUEValue = table2D_getRawValue(&WUETable, 9);
+    }
+    else {
+        BIT_SET(currentStatus.engine, BIT_ENGINE_WARMUP);
+        WUEValue = table2D_getValue(&WUETable, currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET);
+    }
+
+    return WUEValue;
+}
+
+float aseTaper;
+
+byte correctionASE(float dt) {
+    int16_t ASEValue = currentStatus.ASEValue;
+    //Two checks are required:
+    //1) Is the engine run time less than the configured ase time
+    //2) Make sure we're not still cranking
+    if (BIT_CHECK(currentStatus.engine, BIT_ENGINE_CRANK) != true) {
+        if ((runtime < (table2D_getValue(&ASECountTable, currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET))) && !(BIT_CHECK(currentStatus.engine, BIT_ENGINE_CRANK)))
+        {
+            BIT_SET(currentStatus.engine, BIT_ENGINE_ASE); //Mark ASE as active.
+            ASEValue = 100 + table2D_getValue(&ASETable, currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET);
+            aseTaper = 0;
+        }
+        else
+        {
+            if (aseTaper < configPage2.aseTaperTime) //Check if we've reached the end of the taper time
+            {
+                BIT_SET(currentStatus.engine, BIT_ENGINE_ASE); //Mark ASE as active.
+                ASEValue = table2D_getValue(&ASETable, currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET);
+                ASEValue *= aseTaper / configPage2.aseTaperTime;
+                ASEValue += 100;
+                aseTaper += dt;
+            }
+            else
+            {
+                BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ASE); //Mark ASE as inactive.
+                ASEValue = 100;
+            }
+        }
+
+        //Safety checks
+        if (ASEValue > 255) { ASEValue = 255; }
+        if (ASEValue < 0) { ASEValue = 0; }
+        ASEValue = (byte)ASEValue;
+    }
+    else {
+        //Engine is cranking, ASE disabled
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ASE); //Mark ASE as inactive.
+        ASEValue = 100;
+    }
+    return ASEValue;
+}
+
+float crankingEnrichTaper = 0;
+
+uint16_t correctionCranking(float dt) {
+    uint16_t crankingValue = 100;
+    //Check if we are actually cranking
+    if (BIT_CHECK(currentStatus.engine, BIT_ENGINE_CRANK))
+    {
+        crankingValue = table2D_getValue(&crankingEnrichTable, currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET);
+        crankingValue = (uint16_t)crankingValue * 5; //multiplied by 5 to get range from 0% to 1275%
+        crankingEnrichTaper = 0;
+    }
+
+    //If we're not cranking, check if if cranking enrichment tapering to ASE should be done
+    else if (crankingEnrichTaper < configPage10.crankingEnrichTaper)
+    {
+        crankingValue = table2D_getValue(&crankingEnrichTable, currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET);
+        crankingValue = (uint16_t)crankingValue * 5; //multiplied by 5 to get range from 0% to 1275%
+        //Taper start value needs to account for ASE that is now running, so total correction does not increase when taper begins
+        unsigned long taperStart = (unsigned long)crankingValue * 100 / currentStatus.ASEValue;
+        crankingValue = taperStart; //Taper from start value to 100%
+        crankingValue *= crankingEnrichTaper / configPage10.crankingEnrichTaper;
+        if (crankingValue < 100) { crankingValue = 100; } //Sanity check
+        crankingEnrichTaper += dt;
+    }
+    return crankingValue;
+}
+
+float activateMAPDOT = 0;
+float activateTPSDOT = 0;
+float MAPlast;
+
+uint16_t correctionAccel(float dt) {
+    int16_t accelValue = 100;
+    int16_t MAP_change = 0;
+    int16_t TPS_change = 0;
+
+    /*if (configPage2.aeMode == AE_MODE_MAP)
+    {
+        //Get the MAP rate change
+        MAP_change = (currentStatus.MAP - MAPlast);
+        currentStatus.mapDOT = ldiv(1000000, (MAP_time - MAPlast_time)).quot * MAP_change; //This is the % per second that the MAP has moved
+        //currentStatus.mapDOT = 15 * MAP_change; //This is the kpa per second that the MAP has moved
+    }
+    else if (configPage2.aeMode == AE_MODE_TPS)
+    {
+        //Get the TPS rate change
+        TPS_change = (currentStatus.TPS - currentStatus.TPSlast);
+        //currentStatus.tpsDOT = ldiv(1000000, (TPS_time - TPSlast_time)).quot * TPS_change; //This is the % per second that the TPS has moved
+        currentStatus.tpsDOT = (TPS_READ_FREQUENCY * TPS_change) / 2; //This is the % per second that the TPS has moved, adjusted for the 0.5% resolution of the TPS
+    }
+
+
+    //First, check whether the accel. enrichment is already running
+    if (BIT_CHECK(currentStatus.engine, BIT_ENGINE_ACC) || BIT_CHECK(currentStatus.engine, BIT_ENGINE_DCC))
+    {
+        //If it is currently running, check whether it should still be running or whether it's reached it's end time
+        if (time(nullptr) >= currentStatus.AEEndTime)
+        {
+            //Time to turn enrichment off
+            BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ACC);
+            BIT_CLEAR(currentStatus.engine, BIT_ENGINE_DCC);
+            currentStatus.AEamount = 0;
+            accelValue = 100;
+
+            //Reset the relevant DOT value to 0
+            if (configPage2.aeMode == AE_MODE_MAP) { currentStatus.mapDOT = 0; }
+            else if (configPage2.aeMode == AE_MODE_TPS) { currentStatus.tpsDOT = 0; }
+        }
+        else
+        {
+            //Enrichment still needs to keep running. 
+            //Simply return the total TAE amount
+            accelValue = currentStatus.AEamount;
+
+            //Need to check whether the accel amount has increased from when AE was turned on
+            //If the accel amount HAS increased, we clear the current enrich phase and a new one will be started below
+            if ((configPage2.aeMode == AE_MODE_MAP) && (abs(currentStatus.mapDOT) > activateMAPDOT))
+            {
+                BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ACC);
+                BIT_CLEAR(currentStatus.engine, BIT_ENGINE_DCC);
+            }
+            else if ((configPage2.aeMode == AE_MODE_TPS) && (abs(currentStatus.tpsDOT) > activateTPSDOT))
+            {
+                BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ACC);
+                BIT_CLEAR(currentStatus.engine, BIT_ENGINE_DCC);
+            }
+        }
+    }
+
+    if (!BIT_CHECK(currentStatus.engine, BIT_ENGINE_ACC) && !BIT_CHECK(currentStatus.engine, BIT_ENGINE_DCC)) //Need to check this again as it may have been changed in the above section (Both ACC and DCC are off if this has changed)
+    {
+        if (configPage2.aeMode == AE_MODE_MAP)
+        {
+            if (abs(MAP_change) <= configPage2.maeMinChange)
+            {
+                accelValue = 100;
+                currentStatus.mapDOT = 0;
+            }
+            else
+            {
+                //If MAE isn't currently turned on, need to check whether it needs to be turned on
+                if (abs(currentStatus.mapDOT) > configPage2.maeThresh)
+                {
+                    activateMAPDOT = abs(currentStatus.mapDOT);
+                    currentStatus.AEEndTime = time(nullptr) + ((unsigned long)configPage2.aeTime * 10000); //Set the time in the future where the enrichment will be turned off. taeTime is stored as mS / 10, so multiply it by 100 to get it in uS
+                    //Check if the MAP rate of change is negative or positive. Negative means decelarion.
+                    if (currentStatus.mapDOT < 0)
+                    {
+                        BIT_SET(currentStatus.engine, BIT_ENGINE_DCC); //Mark deceleration enleanment as active.
+                        accelValue = configPage2.decelAmount; //In decel, use the decel fuel amount as accelValue
+                    } //Deceleration
+                    //Positive MAP rate of change is acceleration.
+                    else
+                    {
+                        BIT_SET(currentStatus.engine, BIT_ENGINE_ACC); //Mark acceleration enrichment as active.
+                        accelValue = table2D_getValue(&maeTable, currentStatus.mapDOT / 10); //The x-axis of mae table is divided by 10 to fit values in byte.
+
+                        //Apply the RPM taper to the above
+                        //The RPM settings are stored divided by 100:
+                        uint16_t trueTaperMin = configPage2.aeTaperMin * 100;
+                        uint16_t trueTaperMax = configPage2.aeTaperMax * 100;
+                        if (currentStatus.RPM > trueTaperMin)
+                        {
+                            if (currentStatus.RPM > trueTaperMax) { accelValue = 0; } //RPM is beyond taper max limit, so accel enrich is turned off
+                            else
+                            {
+                                int16_t taperRange = trueTaperMax - trueTaperMin;
+                                int16_t taperPercent = ((currentStatus.RPM - trueTaperMin) * 100UL) / taperRange; //The percentage of the way through the RPM taper range
+                                accelValue = (((100 - taperPercent) * accelValue) / 100); //Calculate the above percentage of the calculated accel amount. 
+                            }
+                        }
+
+                        //Apply AE cold coolant modifier, if CLT is less than taper end temperature
+                        if (currentStatus.coolant < (int)(configPage2.aeColdTaperMax - CALIBRATION_TEMPERATURE_OFFSET))
+                        {
+                            //If CLT is less than taper min temp, apply full modifier on top of accelValue
+                            if (currentStatus.coolant <= (int)(configPage2.aeColdTaperMin - CALIBRATION_TEMPERATURE_OFFSET))
+                            {
+                                uint16_t accelValue_uint = (configPage2.aeColdPct * accelValue) / 100;
+                                accelValue = (int16_t)accelValue_uint;
+                            }
+                            //If CLT is between taper min and max, taper the modifier value and apply it on top of accelValue
+                            else
+                            {
+                                int16_t taperRange = (int16_t)configPage2.aeColdTaperMax - configPage2.aeColdTaperMin;
+                                int16_t taperPercent = (int)((currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET - configPage2.aeColdTaperMin) * 100) / taperRange;
+                                int16_t coldPct = (int16_t)100 + (((100 - taperPercent) * (configPage2.aeColdPct - 100)) / 100);
+                                uint16_t accelValue_uint = (uint16_t)accelValue * coldPct / 100; //Potential overflow (if AE is large) without using uint16_t (percentage() may overflow)
+                                accelValue = (int16_t)accelValue_uint;
+                            }
+                        }
+                        accelValue = 100 + accelValue; //In case of AE, add the 100 normalisation to the calculated amount
+                    }
+                } //MAE Threshold
+            } //MAP change threshold
+        } //AE Mode
+        else if (configPage2.aeMode == AE_MODE_TPS)
+        {
+            //Check for only very small movement. This not only means we can skip the lookup, but helps reduce false triggering around 0-2% throttle openings
+            if (abs(TPS_change) <= configPage2.taeMinChange)
+            {
+                accelValue = 100;
+                currentStatus.tpsDOT = 0;
+            }
+            else
+            {
+                //If TAE isn't currently turned on, need to check whether it needs to be turned on
+                if (abs(currentStatus.tpsDOT) > configPage2.taeThresh)
+                {
+                    activateTPSDOT = abs(currentStatus.tpsDOT);
+                    currentStatus.AEEndTime = time(nullptr) + ((unsigned long)configPage2.aeTime * 10000); //Set the time in the future where the enrichment will be turned off. taeTime is stored as mS / 10, so multiply it by 100 to get it in uS
+                    //Check if the TPS rate of change is negative or positive. Negative means decelarion.
+                    if (currentStatus.tpsDOT < 0)
+                    {
+                        BIT_SET(currentStatus.engine, BIT_ENGINE_DCC); //Mark deceleration enleanment as active.
+                        accelValue = configPage2.decelAmount; //In decel, use the decel fuel amount as accelValue
+                    } //Deceleration
+                    //Positive TPS rate of change is Acceleration.
+                    else
+                    {
+                        BIT_SET(currentStatus.engine, BIT_ENGINE_ACC); //Mark acceleration enrichment as active.
+                        accelValue = table2D_getValue(&taeTable, currentStatus.tpsDOT / 10); //The x-axis of tae table is divided by 10 to fit values in byte.
+                        //Apply the RPM taper to the above
+                        //The RPM settings are stored divided by 100:
+                        uint16_t trueTaperMin = configPage2.aeTaperMin * 100;
+                        uint16_t trueTaperMax = configPage2.aeTaperMax * 100;
+                        if (currentStatus.RPM > trueTaperMin)
+                        {
+                            if (currentStatus.RPM > trueTaperMax) { accelValue = 0; } //RPM is beyond taper max limit, so accel enrich is turned off
+                            else
+                            {
+                                int16_t taperRange = trueTaperMax - trueTaperMin;
+                                int16_t taperPercent = ((currentStatus.RPM - trueTaperMin) * 100UL) / taperRange; //The percentage of the way through the RPM taper range
+                                accelValue = ((100 - taperPercent) * accelValue); //Calculate the above percentage of the calculated accel amount. 
+                            }
+                        }
+
+                        //Apply AE cold coolant modifier, if CLT is less than taper end temperature
+                        if (currentStatus.coolant < (int)(configPage2.aeColdTaperMax - CALIBRATION_TEMPERATURE_OFFSET))
+                        {
+                            //If CLT is less than taper min temp, apply full modifier on top of accelValue
+                            if (currentStatus.coolant <= (int)(configPage2.aeColdTaperMin - CALIBRATION_TEMPERATURE_OFFSET))
+                            {
+                                uint16_t accelValue_uint = (configPage2.aeColdPct * accelValue) / 100;
+                                accelValue = (int16_t)accelValue_uint;
+                            }
+                            //If CLT is between taper min and max, taper the modifier value and apply it on top of accelValue
+                            else
+                            {
+                                int16_t taperRange = (int16_t)configPage2.aeColdTaperMax - configPage2.aeColdTaperMin;
+                                int16_t taperPercent = (int)((currentStatus.coolant + CALIBRATION_TEMPERATURE_OFFSET - configPage2.aeColdTaperMin) * 100) / taperRange;
+                                int16_t coldPct = (int16_t)100 + (((100 - taperPercent) * (configPage2.aeColdPct - 100)) / 100);
+                                uint16_t accelValue_uint = (uint16_t)accelValue * coldPct / 100; //Potential overflow (if AE is large) without using uint16_t
+                                accelValue = (int16_t)accelValue_uint;
+                            }
+                        }
+                        accelValue = 100 + accelValue; //In case of AE, add the 100 normalisation to the calculated amount
+                    } //Acceleration
+                } //TAE Threshold
+            } //TPS change threshold
+        } //AE Mode
+    } //AE active
+
+    return accelValue;
+}
+
+byte correctionFloodClear()
+{
+    byte floodValue = 100;
+    if (BIT_CHECK(currentStatus.engine, BIT_ENGINE_CRANK))
+    {
+        //Engine is currently cranking, check what the TPS is
+        if (currentStatus.TPS >= configPage4.floodClear)
+        {
+            //Engine is cranking and TPS is above threshold. Cut all fuel
+            floodValue = 0;
+        }
+    }
+    return floodValue;
+}
+
+uint32_t AFRnextCycle;
+
+byte correctionAFRClosedLoop(float dt, Engine* engine)
+{
+    byte AFRValue = 100;
+
+    if ((configPage6.egoType > 0) || (configPage2.incorporateAFR == true)) //afrTarget value lookup must be done if O2 sensor is enabled, and always if incorporateAFR is enabled
+    {
+        currentStatus.afrTarget = currentStatus.O2; //Catch all in case the below doesn't run. This prevents the Include AFR option from doing crazy things if the AFR target conditions aren't met. This value is changed again below if all conditions are met.
+
+        //Determine whether the Y axis of the AFR target table tshould be MAP (Speed-Density) or TPS (Alpha-N)
+        //Note that this should only run after the sensor warmup delay when using Include AFR option, but on Incorporate AFR option it needs to be done at all times
+        if ((currentStatus.runSecs > configPage6.ego_sdelay) || (configPage2.incorporateAFR == true)) { currentStatus.afrTarget = get3DTableValue(&afrTable, currentStatus.fuelLoad, currentStatus.RPM); } //Perform the target lookup
+    }
+
+    if ((configPage6.egoType > 0) && (BIT_CHECK(currentStatus.status1, BIT_STATUS1_DFCO) != 1)) //egoType of 0 means no O2 sensor. If DFCO is active do not run the ego controllers to prevent interator wind-up.
+    {
+        AFRValue = currentStatus.egoCorrection; //Need to record this here, just to make sure the correction stays 'on' even if the nextCycle count isn't ready
+
+        if ((engine->getIgnitionModule()->m_ignitionCount >= AFRnextCycle) || (engine->getIgnitionModule()->m_ignitionCount < (AFRnextCycle - configPage6.egoCount)))
+        {
+            AFRnextCycle = engine->getIgnitionModule()->m_ignitionCount + configPage6.egoCount; //Set the target ignition event for the next calculation
+
+            //Check all other requirements for closed loop adjustments
+            if ((currentStatus.coolant > (int)(configPage6.egoTemp - CALIBRATION_TEMPERATURE_OFFSET)) && (currentStatus.RPM > (unsigned int)(configPage6.egoRPM * 100)) && (currentStatus.TPS <= configPage6.egoTPSMax) && (currentStatus.O2 < configPage6.ego_max) && (currentStatus.O2 > configPage6.ego_min) && (currentStatus.runSecs > configPage6.ego_sdelay) && (BIT_CHECK(currentStatus.status1, BIT_STATUS1_DFCO) == 0))
+            {
+
+                //Check which algorithm is used, simple or PID
+                if (configPage6.egoAlgorithm == EGO_ALGORITHM_SIMPLE)
+                {
+                    //*************************************************************************************************************************************
+                    //Simple algorithm
+                    if (currentStatus.O2 > currentStatus.afrTarget)
+                    {
+                        //Running lean
+                        if (currentStatus.egoCorrection < (100 + configPage6.egoLimit)) //Fuelling adjustment must be at most the egoLimit amount (up or down)
+                        {
+                            AFRValue = (currentStatus.egoCorrection + 1); //Increase the fuelling by 1%
+                        }
+                        else { AFRValue = currentStatus.egoCorrection; } //Means we're at the maximum adjustment amount, so simply return that again
+                    }
+                    else if (currentStatus.O2 < currentStatus.afrTarget)
+                    {
+                        //Running Rich
+                        if (currentStatus.egoCorrection > (100 - configPage6.egoLimit)) //Fuelling adjustment must be at most the egoLimit amount (up or down)
+                        {
+                            AFRValue = (currentStatus.egoCorrection - 1); //Decrease the fuelling by 1%
+                        }
+                        else { AFRValue = currentStatus.egoCorrection; } //Means we're at the maximum adjustment amount, so simply return that again
+                    }
+                    else { AFRValue = currentStatus.egoCorrection; } //Means we're already right on target
+
+                }
+                else if (configPage6.egoAlgorithm == EGO_ALGORITHM_PID)
+                {
+                    //*************************************************************************************************************************************
+                    //PID algorithm
+                    // hail naw
+                    /*egoPID.SetOutputLimits((long)(-configPage6.egoLimit), (long)(configPage6.egoLimit)); //Set the limits again, just in case the user has changed them since the last loop. Note that these are sent to the PID library as (Eg:) -15 and +15
+                    egoPID.SetTunings(configPage6.egoKP, configPage6.egoKI, configPage6.egoKD); //Set the PID values again, just in case the user has changed them since the last loop
+                    PID_O2 = (long)(currentStatus.O2);
+                    PID_AFRTarget = (long)(currentStatus.afrTarget);
+
+                    bool PID_compute = egoPID.Compute();
+                    //currentStatus.egoCorrection = 100 + PID_output;
+                    if (PID_compute == true) { AFRValue = 100 + PID_output; }
+                    
+                }
+                else { AFRValue = 100; } // Occurs if the egoAlgorithm is set to 0 (No Correction)
+            } //Multi variable check 
+            else { AFRValue = 100; } // If multivariable check fails disable correction
+        } //Ignition count check
+    } //egoType
+
+    return AFRValue; //Catch all (Includes when AFR target = current AFR
+}
+
+byte correctionBatVoltage()
+{
+    byte batValue = 100;
+    batValue = table2D_getValue(&injectorVCorrectionTable, currentStatus.battery10);
+    return batValue;
+}
+
+byte correctionIATDensity(void)
+{
+    byte IATValue = 100;
+    IATValue = table2D_getValue(&IATDensityCorrectionTable, currentStatus.IAT + CALIBRATION_TEMPERATURE_OFFSET); //currentStatus.IAT is the actual temperature, values in IATDensityCorrectionTable.axisX are temp+offset
+
+    return IATValue;
+}
+
+byte correctionBaro()
+{
+    byte baroValue = 100;
+    baroValue = table2D_getValue(&baroFuelTable, currentStatus.baro);
+
+    return baroValue;
+}
+
+byte correctionFlex()
+{
+    byte flexValue = 100;
+
+    if (configPage2.flexEnabled == 1)
+    {
+        flexValue = table2D_getValue(&flexFuelTable, currentStatus.ethanolPct);
+    }
+    return flexValue;
+}
+
+byte correctionLaunch()
+{
+    byte launchValue = 100;
+    if (currentStatus.launchingHard || currentStatus.launchingSoft) { launchValue = (100 + configPage6.lnchFuelAdd); }
+
+    return launchValue;
+}
+
+float dfcoTaper = 0;
+
+bool correctionDFCO(float dt)
+{
+    bool DFCOValue = false;
+    if (configPage2.dfcoEnabled == 1) {
+        if (BIT_CHECK(currentStatus.status1, BIT_STATUS1_DFCO) == 1) {
+            DFCOValue = (currentStatus.RPM > (configPage4.dfcoRPM * 10)) && (currentStatus.TPS < configPage4.dfcoTPSThresh);
+            if (DFCOValue == false) { dfcoTaper = 0; }
+        }
+        else {
+            if ((currentStatus.TPS < configPage4.dfcoTPSThresh) && (currentStatus.coolant >= (int)(configPage2.dfcoMinCLT - CALIBRATION_TEMPERATURE_OFFSET)) && (currentStatus.RPM > (unsigned int)((configPage4.dfcoRPM * 10) + configPage4.dfcoHyster))) {
+                if (dfcoTaper < configPage2.dfcoDelay) {
+                    dfcoTaper += dt;
+                }
+                else { DFCOValue = true; }
+            }
+            else { dfcoTaper = 0; } //Prevent future activation right away if previous time wasn't activated
+        } // DFCO active check
+    } // DFCO enabled check
+    return DFCOValue;
+}
+
+// calculate fuel corrections
+uint32_t EngineSimApplication::fuelCorrections(float dt) {
+    uint32_t sumCorrections = 100;
+    byte numCorrections = 0;
+
+    currentStatus.wueCorrection = correctionWUE(dt); numCorrections++;
+    currentStatus.ASEValue = correctionASE(dt); numCorrections++;
+    uint16_t correctionCrankingValue = correctionCranking(dt); numCorrections++;
+    currentStatus.AEamount = correctionAccel(dt); numCorrections++;
+    uint8_t correctionFloodClearValue = correctionFloodClear(); numCorrections++;
+    currentStatus.egoCorrection = correctionAFRClosedLoop(dt, m_iceEngine); numCorrections++;
+
+    currentStatus.batCorrection = correctionBatVoltage(); numCorrections++;
+    currentStatus.iatCorrection = correctionIATDensity(); numCorrections++;
+    currentStatus.baroCorrection = correctionBaro(); numCorrections++;
+    currentStatus.flexCorrection = correctionFlex(); numCorrections++;
+    currentStatus.launchCorrection = correctionLaunch(); numCorrections++;
+
+    bool dfco = correctionDFCO(dt);
+    if (dfco) {
+        BIT_SET(currentStatus.status1, BIT_STATUS1_DFCO);
+        return 0;
+    }
+    else {
+        BIT_CLEAR(currentStatus.status1, BIT_STATUS1_DFCO);
+    }
+
+    sumCorrections = currentStatus.wueCorrection \
+        + currentStatus.ASEValue \
+        + correctionCrankingValue \
+        + currentStatus.AEamount \
+        + correctionFloodClearValue \
+        + currentStatus.batCorrection \
+        + currentStatus.iatCorrection \
+        + currentStatus.baroCorrection \
+        + currentStatus.flexCorrection \
+        + currentStatus.launchCorrection;
+    return (sumCorrections);
+}*/
+
+
+/**
+ * @brief Looks up and returns the VE value from the secondary fuel table
+ *
+ * This performs largely the same operations as getVE() however the lookup is of the secondary fuel table and uses the secondary load source
+ * @return byte
+ */
+byte getVE2(void)
+{
+    byte tempVE = 100;
+    if (configPage10.fuel2Algorithm == LOAD_SOURCE_MAP) {
+        //Speed Density
+        currentStatus.fuelLoad2 = currentStatus.MAP;
+    }
+    else if (configPage10.fuel2Algorithm == LOAD_SOURCE_TPS) {
+        //Alpha-N
+        currentStatus.fuelLoad2 = currentStatus.TPS * 2;
+    }
+    else if (configPage10.fuel2Algorithm == LOAD_SOURCE_IMAPEMAP) {
+        //IMAP / EMAP
+        currentStatus.fuelLoad2 = (currentStatus.MAP * 100) / currentStatus.EMAP;
+    }
+    else { currentStatus.fuelLoad2 = currentStatus.MAP; } //Fallback position
+    tempVE = get3DTableValue(&fuelTable2, currentStatus.fuelLoad2, currentStatus.RPM); //Perform lookup into fuel map for RPM vs MAP value
+
+    return tempVE;
+}
+
+/**
+ * @brief Performs a lookup of the second ignition advance table. The values used to look this up will be RPM and whatever load source the user has configured
+ *
+ * @return byte The current target advance value in degrees
+ */
+byte getAdvance2(void)
+{
+    byte tempAdvance = 0;
+    if (configPage10.spark2Algorithm == LOAD_SOURCE_MAP) { //Check which fuelling algorithm is being used
+        //Speed Density
+        currentStatus.ignLoad2 = currentStatus.MAP;
+    }
+    else if (configPage10.spark2Algorithm == LOAD_SOURCE_TPS) {
+        //Alpha-N
+        currentStatus.ignLoad2 = currentStatus.TPS * 2;
+    }
+    else if (configPage10.spark2Algorithm == LOAD_SOURCE_IMAPEMAP) {
+        //IMAP / EMAP
+        currentStatus.ignLoad2 = (currentStatus.MAP * 100) / currentStatus.EMAP;
+    }
+    else { currentStatus.ignLoad2 = currentStatus.MAP; }
+    tempAdvance = get3DTableValue(&ignitionTable2, currentStatus.ignLoad2, currentStatus.RPM) - OFFSET_IGNITION; //As above, but for ignition advance
+    //tempAdvance = correctionsIgn(tempAdvance);
+
+    return tempAdvance;
+}
+
+void calculateFuel(void)
+{
+    //If the secondary fuel table is in use, also get the VE value from there
+    BIT_CLEAR(currentStatus.status3, BIT_STATUS3_FUEL2_ACTIVE); //Clear the bit indicating that the 2nd fuel table is in use. 
+    
+    currentStatus.VE1 = get3DTableValue(&fuelTable, currentStatus.fuelLoad, currentStatus.RPM);
+    currentStatus.VE = currentStatus.VE1;
+
+    if (configPage10.fuel2Mode > 0)
+    {
+        if (configPage10.fuel2Mode == FUEL2_MODE_MULTIPLY)
+        {
+            currentStatus.VE2 = getVE2();
+            //Fuel 2 table is treated as a % value. Table 1 and 2 are multiplied together and divided by 100
+            uint16_t combinedVE = ((uint16_t)currentStatus.VE1 * (uint16_t)currentStatus.VE2) / 100;
+            if (combinedVE <= 255) { currentStatus.VE = combinedVE; }
+            else { currentStatus.VE = 255; }
+        }
+        else if (configPage10.fuel2Mode == FUEL2_MODE_ADD)
+        {
+            currentStatus.VE2 = getVE2();
+            //Fuel tables are added together, but a check is made to make sure this won't overflow the 8-bit VE value
+            uint16_t combinedVE = (uint16_t)currentStatus.VE1 + (uint16_t)currentStatus.VE2;
+            if (combinedVE <= 255) { currentStatus.VE = combinedVE; }
+            else { currentStatus.VE = 255; }
+        }
+        else if (configPage10.fuel2Mode == FUEL2_MODE_CONDITIONAL_SWITCH)
+        {
+            if (configPage10.fuel2SwitchVariable == FUEL2_CONDITION_RPM)
+            {
+                if (currentStatus.RPM > configPage10.fuel2SwitchValue)
+                {
+                    BIT_SET(currentStatus.status3, BIT_STATUS3_FUEL2_ACTIVE); //Set the bit indicating that the 2nd fuel table is in use. 
+                    currentStatus.VE2 = getVE2();
+                    currentStatus.VE = currentStatus.VE2;
+                }
+            }
+            else if (configPage10.fuel2SwitchVariable == FUEL2_CONDITION_MAP)
+            {
+                if (currentStatus.MAP > configPage10.fuel2SwitchValue)
+                {
+                    BIT_SET(currentStatus.status3, BIT_STATUS3_FUEL2_ACTIVE); //Set the bit indicating that the 2nd fuel table is in use. 
+                    currentStatus.VE2 = getVE2();
+                    currentStatus.VE = currentStatus.VE2;
+                }
+            }
+            else if (configPage10.fuel2SwitchVariable == FUEL2_CONDITION_TPS)
+            {
+                if (currentStatus.TPS > configPage10.fuel2SwitchValue)
+                {
+                    BIT_SET(currentStatus.status3, BIT_STATUS3_FUEL2_ACTIVE); //Set the bit indicating that the 2nd fuel table is in use. 
+                    currentStatus.VE2 = getVE2();
+                    currentStatus.VE = currentStatus.VE2;
+                }
+            }
+            else if (configPage10.fuel2SwitchVariable == FUEL2_CONDITION_ETH)
+            {
+                if (currentStatus.ethanolPct > configPage10.fuel2SwitchValue)
+                {
+                    BIT_SET(currentStatus.status3, BIT_STATUS3_FUEL2_ACTIVE); //Set the bit indicating that the 2nd fuel table is in use. 
+                    currentStatus.VE2 = getVE2();
+                    currentStatus.VE = currentStatus.VE2;
+                }
+            }
+        }
+        /* Not supported
+        else if (configPage10.fuel2Mode == FUEL2_MODE_INPUT_SWITCH)
+        {
+            if (digitalRead(pinFuel2Input) == configPage10.fuel2InputPolarity)
+            {
+                BIT_SET(currentStatus.status3, BIT_STATUS3_FUEL2_ACTIVE); //Set the bit indicating that the 2nd fuel table is in use. 
+                currentStatus.VE2 = getVE2();
+                currentStatus.VE = currentStatus.VE2;
+            }
+        }
+        */
+    }
+}
+
+void calculateSpark(void)
+{
+    //Same as above but for the secondary ignition table
+    BIT_CLEAR(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Clear the bit indicating that the 2nd spark table is in use. 
+    
+    currentStatus.advance1 = get3DTableValue(&ignitionTable, currentStatus.ignLoad, currentStatus.RPM) - 40;
+    currentStatus.advance = currentStatus.advance1;
+
+    if (configPage10.spark2Mode > 0)
+    {
+        if (configPage10.spark2Mode == SPARK2_MODE_MULTIPLY)
+        {
+            BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE);
+            currentStatus.advance2 = getAdvance2();
+            //make sure we don't have a negative value in the multiplier table (sharing a signed 8 bit table)
+            if (currentStatus.advance2 < 0) { currentStatus.advance2 = 0; }
+            //Spark 2 table is treated as a % value. Table 1 and 2 are multiplied together and divided by 100
+            int16_t combinedAdvance = ((int16_t)currentStatus.advance1 * (int16_t)currentStatus.advance2) / 100;
+            //make sure we don't overflow and accidentally set negative timing, currentStatus.advance can only hold a signed 8 bit value
+            if (combinedAdvance <= 127) { currentStatus.advance = combinedAdvance; }
+            else { currentStatus.advance = 127; }
+        }
+        else if (configPage10.spark2Mode == SPARK2_MODE_ADD)
+        {
+            BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Set the bit indicating that the 2nd spark table is in use. 
+            currentStatus.advance2 = getAdvance2();
+            //Spark tables are added together, but a check is made to make sure this won't overflow the 8-bit VE value
+            int16_t combinedAdvance = (int16_t)currentStatus.advance1 + (int16_t)currentStatus.advance2;
+            //make sure we don't overflow and accidentally set negative timing, currentStatus.advance can only hold a signed 8 bit value
+            if (combinedAdvance <= 127) { currentStatus.advance = combinedAdvance; }
+            else { currentStatus.advance = 127; }
+        }
+        else if (configPage10.spark2Mode == SPARK2_MODE_CONDITIONAL_SWITCH)
+        {
+            if (configPage10.spark2SwitchVariable == SPARK2_CONDITION_RPM)
+            {
+                if (currentStatus.RPM > configPage10.spark2SwitchValue)
+                {
+                    BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Set the bit indicating that the 2nd spark table is in use. 
+                    currentStatus.advance2 = getAdvance2();
+                    currentStatus.advance = currentStatus.advance2;
+                }
+            }
+            else if (configPage10.spark2SwitchVariable == SPARK2_CONDITION_MAP)
+            {
+                if (currentStatus.MAP > configPage10.spark2SwitchValue)
+                {
+                    BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Set the bit indicating that the 2nd spark table is in use. 
+                    currentStatus.advance2 = getAdvance2();
+                    currentStatus.advance = currentStatus.advance2;
+                }
+            }
+            else if (configPage10.spark2SwitchVariable == SPARK2_CONDITION_TPS)
+            {
+                if (currentStatus.TPS > configPage10.spark2SwitchValue)
+                {
+                    BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Set the bit indicating that the 2nd spark table is in use. 
+                    currentStatus.advance2 = getAdvance2();
+                    currentStatus.advance = currentStatus.advance2;
+                }
+            }
+            else if (configPage10.spark2SwitchVariable == SPARK2_CONDITION_ETH)
+            {
+                if (currentStatus.ethanolPct > configPage10.spark2SwitchValue)
+                {
+                    BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Set the bit indicating that the 2nd spark table is in use. 
+                    currentStatus.advance2 = getAdvance2();
+                    currentStatus.advance = currentStatus.advance2;
+                }
+            }
+        }
+        /* Not supported
+        else if (configPage10.spark2Mode == SPARK2_MODE_INPUT_SWITCH)
+        {
+            if (digitalRead(pinSpark2Input) == configPage10.spark2InputPolarity)
+            {
+                BIT_SET(currentStatus.spark2, BIT_SPARK2_SPARK2_ACTIVE); //Set the bit indicating that the 2nd spark table is in use. 
+                currentStatus.advance2 = getAdvance2();
+                currentStatus.advance = currentStatus.advance2;
+            }
+        }
+        */
+
+        //Apply the fixed timing correction manually. This has to be done again here if any of the above conditions are met to prevent any of the seconadary calculations applying instead of fixec timing
+        // this is applied in the ecmProcess function
+        //currentStatus.advance = correctionFixedTiming(currentStatus.advance);
+        //currentStatus.advance = correctionCrankingFixedTiming(currentStatus.advance); //This overrides the regular fixed timing, must come last
+    }
+}
+
+float aseTime = 0;
+float aseMaxTime = 0;
+float aseTaperTime = 0;
+
 void EngineSimApplication::ecmProcess(float dt) {
-    // replace by config value & config trigger value & config tps value
     float tps = 1 - m_iceEngine->getThrottle();
+
+    // Count the time from starting the engine
+    if (countRuntime)
+        runtime += dt;
+
+    #pragma region 2step and 3 step
 
     if (currentStatus.clutchEngagedRPM < (configPage6.flatSArm * 100) && m_targetClutchPressure <= 0.0 && tps >= (configPage10.lnchCtrlTPS / 255) && configPage6.launchEnabled) {
         m_iceEngine->getIgnitionModule()->m_2stepSoftCutAngle = configPage6.lnchRetard;
@@ -454,7 +1174,7 @@ void EngineSimApplication::ecmProcess(float dt) {
     }
     else if (currentStatus.clutchEngagedRPM > (configPage6.flatSArm * 100) && m_targetClutchPressure <= 0.0 && configPage6.flatSEnable) {
         m_iceEngine->getIgnitionModule()->m_3stepSoftCutAngle = configPage6.flatSRetard;
-        m_iceEngine->getIgnitionModule()->m_3stepSoftCutLimit = configPage6.flatSSoftWin;
+        m_iceEngine->getIgnitionModule()->m_3stepSoftCutLimit = configPage6.flatSSoftWin * 100;
         m_iceEngine->getIgnitionModule()->m_3stepEnabled = true;
     }
     else {
@@ -464,12 +1184,27 @@ void EngineSimApplication::ecmProcess(float dt) {
         m_iceEngine->getIgnitionModule()->m_retardAmount = 0;
     }
 
+    #pragma endregion
+
+    #pragma region Soft/Hard revlimit
+
     if (units::rpm(m_iceEngine->getRpm()) > configPage4.SoftRevLim * 10) {
         m_iceEngine->getIgnitionModule()->m_retard = true;
         m_iceEngine->getIgnitionModule()->m_retardAmount = -configPage4.SoftLimRetard;
+        BIT_SET(currentStatus.spark, BIT_SPARK_SFTLIM);
+        BIT_SET(currentStatus.engineProtectStatus, ENGINE_PROTECT_BIT_RPM);
         if (units::rpm(m_iceEngine->getRpm()) > configPage4.HardRevLim * 10) {
             m_iceEngine->getIgnitionModule()->m_revLimitTimer = 1;
             m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
+            BIT_SET(currentStatus.spark, BIT_SPARK_HRDLIM);
+        }
+        else {
+            if (!m_iceEngine->getIgnitionModule()->m_2stepEnabled && !m_iceEngine->getIgnitionModule()->m_3stepEnabled) {
+                m_iceEngine->getIgnitionModule()->m_retard = false;
+                m_iceEngine->getIgnitionModule()->m_retardAmount = 0;
+                m_iceEngine->getIgnitionModule()->m_revLimitTimer = 0;
+            }
+            BIT_CLEAR(currentStatus.spark, BIT_SPARK_HRDLIM);
         }
         m_iceEngine->getIgnitionModule()->m_limiter = true;
     }
@@ -479,6 +1214,8 @@ void EngineSimApplication::ecmProcess(float dt) {
         m_iceEngine->getIgnitionModule()->m_revLimitTimer = 1;
         m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
         m_iceEngine->getIgnitionModule()->m_limiter = true;
+        BIT_SET(currentStatus.spark, BIT_SPARK_HRDLIM);
+        BIT_SET(currentStatus.engineProtectStatus, ENGINE_PROTECT_BIT_RPM);
     }
     else {
         if (!m_iceEngine->getIgnitionModule()->m_2stepEnabled && !m_iceEngine->getIgnitionModule()->m_3stepEnabled) {
@@ -486,67 +1223,251 @@ void EngineSimApplication::ecmProcess(float dt) {
             m_iceEngine->getIgnitionModule()->m_retardAmount = 0;
             m_iceEngine->getIgnitionModule()->m_revLimitTimer = 0;
         }
+        BIT_CLEAR(currentStatus.spark, BIT_SPARK_SFTLIM);
+        BIT_CLEAR(currentStatus.spark, BIT_SPARK_HRDLIM);
+        BIT_CLEAR(currentStatus.engineProtectStatus, ENGINE_PROTECT_BIT_RPM);
         // disable stock rev limiter
-        m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
+        // m_iceEngine->getIgnitionModule()->m_revLimit = 99999;
         m_iceEngine->getIgnitionModule()->m_limiter = false;
     }
+
+    #pragma endregion
 
     //std::stringstream ss;
     //ss << m_iceEngine->getIgnitionModule()->m_revLimitTimer << ":" << m_iceEngine->getIgnitionModule()->m_limiter << " : " << m_iceEngine->getIgnitionModule()->m_retardAmount << ":" << m_iceEngine->getIgnitionModule()->m_retard << " : " << m_iceEngine->getIgnitionModule()->m_currentTableValue;
     //m_infoCluster->setLogMessage(ss.str());
 
-    if(m_simulator->m_starterMotor.m_enabled && currentStatus.RPM < m_simulator->m_starterMotor.m_rotationSpeed)
+    #pragma region Crank/Run engine flags
+
+    if (m_simulator->m_starterMotor.m_enabled && currentStatus.RPM < (configPage4.crankRPM * 10)) {
         BIT_SET(currentStatus.engine, BIT_ENGINE_CRANK);
+
+        // ASE Time setup
+        aseTaperTime = configPage2.aseTaperTime / 10; // Config is in 100ms and not 1s
+        aseMaxTime = table2D_getValue(&ASECountTable, currentStatus.coolant); // Get regular time from table
+        aseTime = aseTaperTime + aseMaxTime; // Combine time
+        
+        // enable runtime count thing
+        countRuntime = true;
+        runtime = 0.0f;
+    }
     else
         BIT_CLEAR(currentStatus.engine, BIT_ENGINE_CRANK);
 
-    if(currentStatus.RPM > 200 && !m_simulator->m_starterMotor.m_enabled)
+    if (!m_iceEngine->getIgnitionModule()->m_enabled && countRuntime)
+        countRuntime = false;
+
+    if (currentStatus.RPM > (configPage4.crankRPM * 100) && !m_simulator->m_starterMotor.m_enabled) {
         BIT_SET(currentStatus.engine, BIT_ENGINE_RUN);
+        countRuntime = true;
+    }
     else
         BIT_CLEAR(currentStatus.engine, BIT_ENGINE_RUN);
 
-    //int load = (m_iceEngine->getManifoldPressure() * 100) / 102000;
-    int ign = get3DTableValue(&ignitionTable, currentStatus.ignLoad, currentStatus.RPM);
-    int fuel = get3DTableValue(&fuelTable, currentStatus.fuelLoad, currentStatus.RPM);
-    m_iceEngine->getIgnitionModule()->m_currentTableValue = ign - 40;
-    
-    for (int i = 0; i < m_iceEngine->getIntakeCount(); i++) {
-        m_iceEngine->getIntake(i)->m_fuelInjectAmount = fuel * (9 * 1.25);
+    #pragma endregion
+
+    // Put the current VE/fuel value in currentStatus.VE (current VE in TS)
+    calculateFuel();
+    //float fuel = get3DTableValue(&fuelTable, currentStatus.fuelLoad, currentStatus.RPM);
+    float correction = 100;
+
+    #pragma region Fuel Corrections
+
+    // Warmup Enrichment (WUE)
+
+    float wue = 1000;
+    if (currentStatus.coolant > (table2D_getAxisValue(&WUETable, 9) - CALIBRATION_TEMPERATURE_OFFSET)) {
+        //This prevents us doing the 2D lookup if we're already up to temp
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_WARMUP);
+        wue = table2D_getRawValue(&WUETable, 9);
     }
+    else {
+        BIT_SET(currentStatus.engine, BIT_ENGINE_WARMUP);
+        wue = table2D_getValue(&WUETable, currentStatus.coolant);
+    }
+    currentStatus.wueCorrection = wue;
+
+    // After start enrichment (ASE)
+
+    float ase = 0;
+    ase = table2D_getValue(&ASETable, currentStatus.coolant);
+    aseTime -= dt;
+    if (aseTime <= aseTaperTime && aseTime >= 0) {
+        // Taper ASE value
+        ase *= aseTime / aseTaperTime;
+        BIT_SET(currentStatus.engine, BIT_ENGINE_ASE);
+    }
+    else if (aseTime <= 0) {
+        aseTime = 0;
+        ase = 0;
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ASE);
+    }
+    else {
+        BIT_SET(currentStatus.engine, BIT_ENGINE_ASE);
+    }
+    currentStatus.ASEValue = ase;
+    
+    correction = wue + ase;
+
+    BIT_CLEAR(currentStatus.status1, BIT_STATUS1_DFCO);
+    if (configPage2.dfcoEnabled) {
+        if (currentStatus.TPS < configPage4.dfcoTPSThresh) {
+            if (currentStatus.RPM > configPage4.dfcoRPM * 10) {
+                BIT_SET(currentStatus.status1, BIT_STATUS1_DFCO);
+                correction = 0;
+            }
+        }
+    }
+
+    #pragma endregion
+
+    currentStatus.VE *= correction / 100;
+    currentStatus.corrections = correction;
+
+    // Put the current spark value in currentStatus.advance (current advance in TS)
+    calculateSpark();
+    //float ign = get3DTableValue(&ignitionTable, currentStatus.ignLoad, currentStatus.RPM);
+    
+    #pragma region Ignition Corrections
+
+    //float idleAdvance = table2D_getValue(&idleAdvanceTable, currentStatus.rpmDOT);
+    float iatRetard = -table2D_getValue(&IATRetardTable, currentStatus.IAT - CALIBRATION_TEMPERATURE_OFFSET);
+
+    currentStatus.advance += iatRetard;
+
+    float idleTarget = table2D_getValue(&idleTargetTable, currentStatus.coolant - CALIBRATION_TEMPERATURE_OFFSET);
+    if (configPage2.fixAngEnable == 1) { currentStatus.advance = configPage4.FixAng; } //Check whether the user has set a fixed timing angle
+    if (BIT_CHECK(currentStatus.engine, BIT_ENGINE_CRANK))
+    {
+        if (configPage2.crkngAddCLTAdv == 0) { currentStatus.advance = configPage4.CrankAng; } //Use the fixed cranking ignition angle
+        else { currentStatus.advance = configPage4.CrankAng + (table2D_getValue(&CLTAdvanceTable, currentStatus.coolant - CALIBRATION_TEMPERATURE_OFFSET) - 15); } //Use the CLT compensated cranking ignition angle
+    }
+
+    #pragma endregion
+
+    m_iceEngine->getIgnitionModule()->m_currentTableValue = currentStatus.advance;
+    
+    for (int i = 0; i < m_iceEngine->getIntakeCount(); i++)
+        m_iceEngine->getIntake(i)->m_fuelInjectAmount = currentStatus.VE * (9 * 1.25);
+    
+    float pw = currentStatus.VE * (9 * 1.25);
+    pw /= 50;
+    pw *= 1000;
+    currentStatus.PW1 = pw;
+    currentStatus.PW2 = pw;
+    currentStatus.PW3 = pw;
+    currentStatus.PW4 = pw;
+    currentStatus.PW5 = pw;
+    currentStatus.PW6 = pw;
+    currentStatus.PW7 = pw;
+    currentStatus.PW8 = pw;
 }
 
-void EngineSimApplication::ecmStatus() {
+void EngineSimApplication::ecmStatus(float dt) {
+    IgnitionModule* ign = m_iceEngine->getIgnitionModule();
+
+    //std::stringstream ss;
+    //ss << "BOOST: " << m_simulator->m_turbo.m_boost << " RPM: " << m_simulator->m_turbo.GetRotorRPM();
+    //m_infoCluster->setLogMessage(ss.str());
+
     long prevRPM = currentStatus.longRPM;
     currentStatus.rpmDOT = m_iceEngine->getRpm() - prevRPM;
     currentStatus.longRPM = m_iceEngine->getRpm();
     currentStatus.RPM = currentStatus.longRPM;
     currentStatus.RPMdiv100 = currentStatus.longRPM / 100;
 
+    #pragma region Intake Related Statuses
+
     float tps = 1 - m_iceEngine->getThrottle();
     currentStatus.TPSlast = currentStatus.TPS;
     currentStatus.TPS = std::round(200.0 * tps);
+    currentStatus.tpsDOT = (currentStatus.TPS - currentStatus.TPSlast) / dt;
     currentStatus.tpsADC = std::round(255.0 * tps);
 
+    MAPlast = currentStatus.MAP;
     currentStatus.MAP = (m_iceEngine->getManifoldPressure() * 100) / 102000;
-    currentStatus.ignLoad = currentStatus.MAP;
-    currentStatus.fuelLoad = currentStatus.MAP;
+    currentStatus.mapDOT = (currentStatus.MAP - MAPlast) / dt;
 
-    currentStatus.VE = m_iceEngine->getIntake(0)->m_fuelInjectAmount / (9 * 1.25);
+    if (configPage2.fuelAlgorithm == LOAD_SOURCE_MAP)
+        currentStatus.fuelLoad = currentStatus.MAP;
+    else if (configPage2.fuelAlgorithm == LOAD_SOURCE_TPS)
+        currentStatus.fuelLoad = currentStatus.TPS * 2;
+    else if (configPage2.fuelAlgorithm == LOAD_SOURCE_IMAPEMAP)
+        currentStatus.fuelLoad = (currentStatus.MAP * 100) / currentStatus.EMAP;
+    else { currentStatus.fuelLoad = currentStatus.MAP; }
+
+    if (configPage2.ignAlgorithm == LOAD_SOURCE_MAP)
+        currentStatus.ignLoad = currentStatus.MAP;
+    else if (configPage2.ignAlgorithm == LOAD_SOURCE_TPS)
+        currentStatus.ignLoad = currentStatus.TPS * 2;
+    else if (configPage2.ignAlgorithm == LOAD_SOURCE_IMAPEMAP)
+        currentStatus.ignLoad = (currentStatus.MAP * 100) / currentStatus.EMAP;
+    else { currentStatus.ignLoad = currentStatus.MAP; }
+
+    //currentStatus.VE = m_iceEngine->getIntake(0)->m_fuelInjectAmount / (9 * 1.25);
+    #pragma endregion
 
     float rpmRed = (units::rpm(m_iceEngine->getRpm()) / m_iceEngine->getRedline());
     //tscpp.currentStatus.battery10 = ((units::rpm(m_iceEngine->getRpm()) / m_iceEngine->getRedline()) * 44) + 124;
-    currentStatus.battery10 = (rpmRed * 24) + 124;
+    currentStatus.battery10 = (rpmRed * 24) + 120;
 
-    currentStatus.advance = (m_iceEngine->getIgnitionModule()->getTimingAdvance() / units::deg) * (m_iceEngine->getStarterSpeed() < 0 ? -1 : 1);
-    currentStatus.advance1 = currentStatus.advance;
-    currentStatus.advance2 = currentStatus.advance;
-    currentStatus.launchingHard = m_iceEngine->getIgnitionModule()->m_launchingHard;
-    currentStatus.launchingSoft = m_iceEngine->getIgnitionModule()->m_launchingSoft;
+    //currentStatus.advance = (ign->getTimingAdvance() / units::deg) * (m_iceEngine->isSpinningCw() ? 1 : -1);
+    //currentStatus.advance1 = currentStatus.advance;
+    //currentStatus.advance2 = currentStatus.advance;
+  
+    currentStatus.launchingHard = ign->m_launchingHard;
+    currentStatus.launchingSoft = ign->m_launchingSoft;
+    if (currentStatus.launchingHard) {
+        BIT_SET(currentStatus.spark, BIT_SPARK_HLAUNCH);
+    }
+    else {
+        BIT_CLEAR(currentStatus.spark, BIT_SPARK_HLAUNCH);
+    }
+
+    if (currentStatus.launchingSoft) {
+        BIT_SET(currentStatus.spark, BIT_SPARK_SLAUNCH);
+    }
+    else {
+        BIT_CLEAR(currentStatus.spark, BIT_SPARK_SLAUNCH);
+    }
+
+    currentStatus.flatShiftingHard = ign->m_shiftingHard;
+
+    if (currentStatus.TPS >= 100) {
+        BIT_SET(currentStatus.engine, BIT_ENGINE_ACC);
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_DCC);
+    }
+    else if (currentStatus.RPM > 1000) { // if higher than idle
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ACC);
+        BIT_SET(currentStatus.engine, BIT_ENGINE_DCC);
+    }
+    else {
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_ACC);
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_DCC);
+    }
+
+    if (currentStatus.MAP >= 90) {
+        BIT_SET(currentStatus.engine, BIT_ENGINE_MAPACC);
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_MAPDCC);
+    }
+    else if (currentStatus.RPM > 1000) { // if higher than idle
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_MAPACC);
+        BIT_SET(currentStatus.engine, BIT_ENGINE_MAPDCC);
+    }
+    else {
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_MAPACC);
+        BIT_CLEAR(currentStatus.engine, BIT_ENGINE_MAPDCC);
+    }
+
     currentStatus.gear = m_transmission->getGear() + 1;
     currentStatus.vss = m_vehicle->getSpeed() / (units::km / units::hour);
-    currentStatus.coolant = 127;
-    currentStatus.IAT = 50;
-    currentStatus.fuelPumpOn = m_iceEngine->getIgnitionModule()->m_enabled;
+    currentStatus.coolant = m_simulator->getCoolantTemperature() + 40; // + 40 to support negatives?
+    std::stringstream ss;
+    ss << "BKT: " << m_simulator->getTemperature() << " CLT: " << m_simulator->getCoolantTemperature();
+    m_infoCluster->setLogMessage(ss.str());
+
+    currentStatus.IAT = 24 + 40; // shows up as 24c (intake temp of ES)
+    currentStatus.fuelPumpOn = ign->m_enabled;
     currentStatus.O2 = 255;
     currentStatus.O2ADC = 255;
     currentStatus.nitrous_status = false;
@@ -1096,6 +2017,7 @@ void EngineSimApplication::renderScene() {
         m_mixerCluster->m_bounds = grid1x3.get(grid3x3.get(windowBounds, 0, 0), 0, 2);
         m_infoCluster->m_bounds = grid1x3.get(grid3x3.get(windowBounds, 0, 0), 0, 0, 1, 2);
 
+        m_loggingCluster->setVisible(false);
         m_engineView->setVisible(true);
         m_rightGaugeCluster->setVisible(true);
         m_oscCluster->setVisible(true);
@@ -1113,6 +2035,7 @@ void EngineSimApplication::renderScene() {
         m_engineView->setLocalPosition({ 0, 0 });
         m_engineView->activate();
 
+        m_loggingCluster->setVisible(false);
         m_engineView->setVisible(true);
         m_rightGaugeCluster->setVisible(false);
         m_oscCluster->setVisible(false);
@@ -1133,6 +2056,7 @@ void EngineSimApplication::renderScene() {
 
         m_rightGaugeCluster->m_bounds = grid.get(windowBounds, 2, 0, 1, 1);
 
+        m_loggingCluster->setVisible(false);
         m_engineView->setVisible(true);
         m_rightGaugeCluster->setVisible(true);
         m_oscCluster->setVisible(false);
@@ -1141,7 +2065,7 @@ void EngineSimApplication::renderScene() {
         m_mixerCluster->setVisible(false);
         m_infoCluster->setVisible(false);
     }
-    else if (m_screen == 3) {
+    else if (m_screen == 3) { // TUNING PARAMETERS
         Bounds windowBounds((float)screenWidth, (float)screenHeight, { 0, (float)screenHeight });
         const Bounds top = windowBounds.verticalSplit(0.75f, 1.0f);
         const Bounds bottom = windowBounds.verticalSplit(0.0f, 0.75f);
@@ -1153,8 +2077,57 @@ void EngineSimApplication::renderScene() {
         m_infoCluster->m_bounds = top;
         m_rightGaugeCluster->m_bounds = bottom;
 
+        m_loggingCluster->setVisible(false);
         m_engineView->setVisible(false);
         m_rightGaugeCluster->setVisible(true);
+        m_oscCluster->setVisible(false);
+        m_performanceCluster->setVisible(false);
+        m_loadSimulationCluster->setVisible(false);
+        m_mixerCluster->setVisible(false);
+        m_infoCluster->setVisible(true);
+    }
+    else if (m_screen == 4) { // TUNING DYNO
+        Bounds windowBounds((float)screenWidth, (float)screenHeight, { 0, (float)screenHeight });
+        const Bounds top = windowBounds.verticalSplit(0.25f, 1.0f);
+        const Bounds bottom = windowBounds.verticalSplit(0.0f, 0.25f);
+        //const Bounds bottomtop = bottom.verticalSplit(0.0f, 0.5f);
+        //const Bounds bottombottom = bottom.verticalSplit(0.5f, 1.0f);
+        m_engineView->setDrawFrame(false);
+        //m_engineView->setBounds(grid.get(windowBounds, 0, 0, 2, 1));
+        //m_engineView->setLocalPosition({ 0, 0 });
+        m_engineView->activate();
+
+        //m_infoCluster->m_bounds = top;
+        m_rightGaugeCluster->m_bounds = top;
+        m_loadSimulationCluster->m_bounds = bottom;
+
+        m_loggingCluster->setVisible(false);
+        m_engineView->setVisible(false);
+        m_rightGaugeCluster->setVisible(true);
+        m_oscCluster->setVisible(false);
+        m_performanceCluster->setVisible(false);
+        m_loadSimulationCluster->setVisible(true);
+        m_mixerCluster->setVisible(false);
+        m_infoCluster->setVisible(false);
+    }
+    else if (m_screen == 5) { // LOGGING SHIT
+        Bounds windowBounds((float)screenWidth, (float)screenHeight, { 0, (float)screenHeight });
+        const Bounds top = windowBounds.verticalSplit(0.75f, 1.0f);
+        const Bounds bottom = windowBounds.verticalSplit(0.0f, 0.75f);
+        //const Bounds bottomtop = bottom.verticalSplit(0.0f, 0.5f);
+        //const Bounds bottombottom = bottom.verticalSplit(0.5f, 1.0f);
+        m_engineView->setDrawFrame(false);
+        //m_engineView->setBounds(grid.get(windowBounds, 0, 0, 2, 1));
+        //m_engineView->setLocalPosition({ 0, 0 });
+        m_engineView->activate();
+
+        m_infoCluster->m_bounds = top;
+        //m_rightGaugeCluster->m_bounds = top;
+        m_loggingCluster->m_bounds = bottom;
+
+        m_loggingCluster->setVisible(true);
+        m_engineView->setVisible(false);
+        m_rightGaugeCluster->setVisible(false);
         m_oscCluster->setVisible(false);
         m_performanceCluster->setVisible(false);
         m_loadSimulationCluster->setVisible(false);
@@ -1205,6 +2178,7 @@ void EngineSimApplication::refreshUserInterface() {
     m_uiManager.destroy();
     m_uiManager.initialize(this);
 
+    m_loggingCluster = m_uiManager.getRoot()->addElement<LoggingCluster>();
     m_engineView = m_uiManager.getRoot()->addElement<EngineView>();
     m_rightGaugeCluster = m_uiManager.getRoot()->addElement<RightGaugeCluster>();
     m_oscCluster = m_uiManager.getRoot()->addElement<OscilloscopeCluster>();
@@ -1213,6 +2187,7 @@ void EngineSimApplication::refreshUserInterface() {
     m_mixerCluster = m_uiManager.getRoot()->addElement<MixerCluster>();
     m_infoCluster = m_uiManager.getRoot()->addElement<InfoCluster>();
 
+    //m_loggingCluster->setApp(this);
     m_infoCluster->setEngine(m_iceEngine);
     m_rightGaugeCluster->m_simulator = m_simulator;
     m_rightGaugeCluster->setEngine(m_iceEngine);
