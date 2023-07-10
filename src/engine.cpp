@@ -92,6 +92,10 @@ void Engine::initialize(const Parameters &params) {
     for (int i = 0; i < m_cylinderCount; ++i) {
         m_combustionChambers[i].setEngine(this);
     }
+
+    m_blockCool = params.blockCool;
+    m_blockCoolRadiator = params.blockCoolRadiator;
+    m_blockFireTemp = params.blockFireTemp;
 }
 
 void Engine::destroy() {

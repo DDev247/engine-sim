@@ -43,18 +43,19 @@ class Crankshaft : public Part {
         inline double getPosY() const { return m_p_y; }
         inline double getFrictionTorque() const { return m_frictionTorque; }
 
+        double m_initialFrictionTorque;
+        double m_frictionTorque;
+        double m_throw;
     protected:
         double *m_rodJournalAngles;
         int m_rodJournalCount;
 
         double m_tdc;
-        double m_throw;
         double m_m;
         double m_I;
         double m_flywheelMass;
         double m_p_x;
         double m_p_y;
-        double m_frictionTorque;
 };
 
 #endif /* ATG_ENGINE_SIM_CRANKSHAFT_H */

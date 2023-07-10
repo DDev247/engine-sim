@@ -31,6 +31,7 @@ void Piston::initialize(const Parameters &params) {
     m_wristPinLocation = params.WristPinPosition;
     m_mass = params.mass;
     m_blowby_k = params.BlowbyFlowCoefficient;
+    m_initialBlowby = params.BlowbyFlowCoefficient;
 }
 
 void Piston::destroy() {

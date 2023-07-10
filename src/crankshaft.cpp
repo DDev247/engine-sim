@@ -32,6 +32,7 @@ void Crankshaft::initialize(const Parameters &params) {
     m_p_y = params.pos_y;
     m_tdc = params.tdc;
     m_frictionTorque = params.frictionTorque;
+    m_initialFrictionTorque = params.frictionTorque;
 }
 
 void Crankshaft::destroy() {

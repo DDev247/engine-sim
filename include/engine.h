@@ -45,9 +45,9 @@ class Engine : public Part {
             double initialNoise;
             double initialJitter;
 
-            double blockCool;
-            double blockCoolRadiator;
-            double blockFireTemp;
+            double blockCool = 0.075f;
+            double blockCoolRadiator = 0.085f;
+            double blockFireTemp = 0.0125f;
         };
 
     public:
@@ -112,6 +112,10 @@ class Engine : public Part {
         double getInitialJitter() const { return m_initialJitter; }
 
         virtual Simulator *createSimulator(Vehicle *vehicle, Transmission *transmission);
+
+        double m_blockCool = 0.075f;
+        double m_blockCoolRadiator = 0.085f;
+        double m_blockFireTemp = 0.0125f;
 
     protected:
         std::string m_name;

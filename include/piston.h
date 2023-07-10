@@ -40,6 +40,8 @@ class Piston : public Part {
         inline double getMass() const { return m_mass; }
         inline double getBlowbyK() const { return m_blowby_k; }
 
+        double m_blowby_k;
+        double m_initialBlowby;
     protected:
         ConnectingRod *m_rod;
         CylinderBank *m_bank;
@@ -49,7 +51,6 @@ class Piston : public Part {
         double m_displacement;
         double m_wristPinLocation;
         double m_mass;
-        double m_blowby_k;
 };
 
 void Piston::setCylinderConstraint(atg_scs::LineConstraint *constraint) {

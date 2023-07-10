@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <chrono>
 #include <set>
+#include <windows.h>
 
 PistonEngineSimulator::PistonEngineSimulator() {
     m_engine = nullptr;
@@ -259,7 +260,7 @@ void PistonEngineSimulator::placeCylinder(int i) {
     const double s0 = (-b + sqrt_det) / (2 * a);
     const double s1 = (-b - sqrt_det) / (2 * a);
 
-    const double s = std::max(s0, s1);
+    const double s = max(s0, s1);
     if (s < 0) return;
 
     const double e_x = s * bank->getDx() + bank->getX();
@@ -291,7 +292,7 @@ void PistonEngineSimulator::simulateStep_() {
             m_engine->getChamber(i)->ignite();
             // Add some temperature?
             if(m_engine->getChamber(i)->m_system.n_fuel() > 0)
-                m_blockTemperature += 0.0125f * (1 - m_engine->getThrottle() + 0.25f);
+                m_blockTemperature += m_engine->m_blockFireTemp * (1 - m_engine->getThrottle() + 0.25f);
         }
 
         m_engine->getChamber(i)->update(timestep);
@@ -321,18 +322,42 @@ void PistonEngineSimulator::simulateStep_() {
     }
 
     // simulate air cooling?
-    m_blockTemperature -= 0.075f * timestep;
+    m_blockTemperature -= m_engine->m_blockCool * timestep;
     //m_blockTemperature -= (0.1f * (units::toRpm(m_engine->getRpm()) / 1000)) * timestep;
     m_blockTemperature -= 0.02f * timestep;
 
     if (m_blockTemperature >= 80) {
         // simulate a coolant valve thing
-        m_blockTemperature -= (0.085f * (units::toRpm(m_engine->getRpm()) / 5000)) * timestep;
+        m_blockTemperature -= (m_engine->m_blockCoolRadiator * (units::toRpm(m_engine->getRpm()) / 5000)) * timestep;
     }
     else if (m_blockTemperature <= 24) {
         m_blockTemperature = 24;
     }
     
+    // for every degree of temp over 110c we add some friction to the engine
+    if (m_blockTemperature >= 110) {
+        float diff = 110 - m_blockTemperature;
+        float a = (diff / 140);
+        for (int i = 0; i < m_engine->getCylinderCount(); i++) {
+            //float torque = a * m_engine->getCrankshaft(i)->m_initialFrictionTorque;
+            //m_engine->getCrankshaft(i)->m_frictionTorque = torque;
+            float bb = a * m_engine->getPiston(i)->m_initialBlowby;
+            bb *= 10;
+            m_engine->getPiston(i)->m_blowby_k = bb;
+        }
+    }
+    else {
+        for (int i = 0; i < m_engine->getCrankshaftCount(); i++) {
+            m_engine->getCrankshaft(i)->m_frictionTorque = m_engine->getCrankshaft(i)->m_initialFrictionTorque;
+        }
+    }
+
+    if (m_blockTemperature >= 200) {
+        MessageBoxW(NULL, (LPCWSTR)L"Congratulations! You've managed to blow your engine by overheating it! As a punishment you have to restart the game.", (LPCWSTR)L"Congratulations!", MB_ICONWARNING | MB_OK);
+        m_engine->destroy();
+        exit(6969);
+    }
+
     float f = 2 * timestep;
     m_coolantTemperature = m_coolantTemperature * (1.0 - f) + (m_blockTemperature * f);
 
@@ -392,7 +417,7 @@ void PistonEngineSimulator::writeToSynthesizer() {
         m_exhaustFlowStagingBuffer[i] = 0;
     }
 
-    const double attenuation = std::min(std::abs(filteredEngineSpeed()), 40.0) / 40.0;
+    const double attenuation = min(std::abs(filteredEngineSpeed()), 40.0) / 40.0;
     const double attenuation_3 = attenuation * attenuation * attenuation;
 
     static double lastValveLift[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };

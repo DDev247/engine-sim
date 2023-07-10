@@ -70,6 +70,9 @@ public node engine_parameters {
     input redline: 6000 * units.rpm;
     input starter_speed: 200 * units.rpm;
     input starter_torque: 200 * units.lb_ft;
+    input blockCool: 0.075;
+    input blockCoolRadiator: 0.085;
+    input blockFireTemp: 0.0125;
     input fuel: fuel();
 }
 
@@ -90,6 +93,10 @@ private node _engine => __engine_sim__engine {
     input hf_gain [float];
     input jitter [float];
     input noise [float];
+
+    input blockCool [float];
+    input blockCoolRadiator [float];
+    input blockFireTemp [float];
 
     alias output __out [engine_channel];
 }
@@ -115,6 +122,10 @@ public node engine {
     input jitter: 0.5;
     input noise: 1.0;
 
+    input blockCool: params.blockCool;
+    input blockCoolRadiator: params.blockCoolRadiator;
+    input blockFireTemp: params.blockFireTemp;
+
     alias output __out [_engine]:
         _engine(
             name: name,
@@ -132,7 +143,10 @@ public node engine {
             simulation_frequency: simulation_frequency,
             hf_gain: hf_gain,
             jitter: jitter,
-            noise: noise
+            noise: noise,
+            blockCool: blockCool,
+            blockCoolRadiator: blockCoolRadiator,
+            blockFireTemp: blockFireTemp
         );
 }
 

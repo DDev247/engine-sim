@@ -164,6 +164,9 @@ namespace es_script {
             addInput("hf_gain", &m_parameters.initialHighFrequencyGain);
             addInput("jitter", &m_parameters.initialJitter);
             addInput("noise", &m_parameters.initialNoise);
+            addInput("blockCool", &m_parameters.blockCool);
+            addInput("blockCoolRadiator", &m_parameters.blockCoolRadiator);
+            addInput("blockFireTemp", &m_parameters.blockFireTemp);
 
             ObjectReferenceNode<EngineNode>::registerInputs();
         }

@@ -1257,7 +1257,7 @@ void EngineSimApplication::ecmProcess(float dt) {
     if (!m_iceEngine->getIgnitionModule()->m_enabled && countRuntime)
         countRuntime = false;
 
-    if (currentStatus.RPM > (configPage4.crankRPM * 100) && !m_simulator->m_starterMotor.m_enabled) {
+    if (currentStatus.RPM > (configPage4.crankRPM * 10) && !m_simulator->m_starterMotor.m_enabled) {
         BIT_SET(currentStatus.engine, BIT_ENGINE_RUN);
         countRuntime = true;
     }
