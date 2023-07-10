@@ -427,6 +427,7 @@ void EngineSimApplication::run() {
 
     m_simulator->endAudioRenderingThread();
     tscpp.StopThreads();
+    //FreeConsole();
 }
 
 void EngineSimApplication::destroy() {
@@ -1462,9 +1463,9 @@ void EngineSimApplication::ecmStatus(float dt) {
     currentStatus.gear = m_transmission->getGear() + 1;
     currentStatus.vss = m_vehicle->getSpeed() / (units::km / units::hour);
     currentStatus.coolant = m_simulator->getCoolantTemperature() + 40; // + 40 to support negatives?
-    std::stringstream ss;
-    ss << "BKT: " << m_simulator->getTemperature() << " CLT: " << m_simulator->getCoolantTemperature();
-    m_infoCluster->setLogMessage(ss.str());
+    //std::stringstream ss;
+    //ss << "BKT: " << m_simulator->getTemperature() << " CLT: " << m_simulator->getCoolantTemperature();
+    //m_infoCluster->setLogMessage(ss.str());
 
     currentStatus.IAT = 24 + 40; // shows up as 24c (intake temp of ES)
     currentStatus.fuelPumpOn = ign->m_enabled;

@@ -48,8 +48,12 @@ void LoggingCluster::render() {
 
     /*std::list<std::string> logs = m_app->tscpp.Log.GetLogs();
     auto log = logs.begin();
-    for (int i = 0; i < logs.size(); i++) {
-        const Bounds bounds = grid.get(bottomInset, 0, i);
+    int a = logs.size() > 50 ? logs.size() - 50 : 0;
+    while (a > 50) {
+        a = a > 50 ? a - 50 : 0;
+    }
+    for (int i = a; i < logs.size(); i++) {
+        const Bounds bounds = grid.get(bottomInset, 0, i - a);
         drawText(*log, bounds, bounds.height(), Bounds::lm);
         log++;
     }*/
