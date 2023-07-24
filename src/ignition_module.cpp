@@ -147,11 +147,15 @@ void IgnitionModule::resetIgnitionEvents() {
 }
 
 double IgnitionModule::getTimingAdvance() {
+    float mult = 1;
+    if (m_ccw)
+        mult = -1;
+
     if (m_retard) {
-        return (m_retardAmount * units::deg);
+        return (m_retardAmount * units::deg) * mult;
     }
     else {
-        return (m_currentTableValue * units::deg) - (m_retardAmount * units::deg);
+        return ((m_currentTableValue * units::deg) - (m_retardAmount * units::deg)) * mult;
     }
 }
 

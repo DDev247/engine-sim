@@ -67,6 +67,8 @@ class IgnitionModule : public Part {
         bool m_retard = false;
         bool m_limiter = false;
 
+        bool m_ccw = false;
+
         uint32_t m_ignitionCount;
         
     protected:

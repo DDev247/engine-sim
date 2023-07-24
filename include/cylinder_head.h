@@ -77,6 +77,8 @@ class CylinderHead : public Part {
         Camshaft *getExhaustCamshaft();
         Camshaft *getIntakeCamshaft();
 
+        Valvetrain* getValvetrain() const { return m_valvetrain; }
+
     protected:
         Cylinder *m_cylinders;
 

@@ -342,3 +342,33 @@ public node M52B28 {
             rev_limit: 8000 * units.rpm
         ))
 }
+
+private node integra_type_r {
+    alias output __out:
+        vehicle(
+            mass: 2400 * units.lb,
+            drag_coefficient: 0.2,
+            cross_sectional_area: (66 * units.inch) * (50 * units.inch),
+            diff_ratio: 3.55,
+            tire_radius: 10 * units.inch,
+            rolling_resistance: 300 * units.N
+        );
+}
+
+private node integra_type_r_transmission {
+    alias output __out:
+        transmission(
+            max_clutch_torque: 300 * units.lb_ft
+        )
+        .add_gear(3.23)
+        .add_gear(2.105)
+        .add_gear(1.458)
+        .add_gear(1.107)
+        .add_gear(0.848);
+}
+
+public node main {
+    set_engine(M52B28())
+    set_vehicle(integra_type_r())
+    set_transmission(integra_type_r_transmission())
+}

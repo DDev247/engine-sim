@@ -154,7 +154,7 @@ add_library(engine-sim STATIC
     include/vehicle.h
     include/vehicle_drag_constraint.h
     include/vtec_valvetrain.h
- "src/turbocharger.cpp" "include/turbocharger.h")
+ "src/turbocharger.cpp" "include/turbocharger.h" "include/lerp_function.h"  "src/lerp_function.cpp")
 
 target_link_libraries(engine-sim
     simple-2d-constraint-solver

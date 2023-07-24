@@ -48,6 +48,8 @@ private:
     double m_minSpeed;
     double m_manifoldVacuum;
     double m_minThrottlePosition;
+    Camshaft* c;
+    Camshaft* c2;
 };
 
 #endif /* ATG_ENGINE_SIM_VTEC_STANDARD_VALVETRAIN_H */

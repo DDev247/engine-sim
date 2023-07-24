@@ -24,9 +24,9 @@
 #include "../discord/Discord.h"
 #endif
 
-std::string EngineSimApplication::s_buildVersion = "0.1.12a EFI 0.2";
+std::string EngineSimApplication::s_buildVersion = "0.1.12a EFI 0.2.1";
 
-EngineSimApplication::EngineSimApplication() : tscpp("COM3", 115200) {
+EngineSimApplication::EngineSimApplication(std::string comPort) : tscpp(comPort, 115200) {
     m_assetPath = "";
 
     m_geometryVertexBuffer = nullptr;
@@ -1161,29 +1161,40 @@ float aseTaperTime = 0;
 void EngineSimApplication::ecmProcess(float dt) {
     float tps = 1 - m_iceEngine->getThrottle();
 
+    if (!m_iceEngine->isSpinningCw())
+        m_iceEngine->getIgnitionModule()->m_ccw = true;
+    else
+        m_iceEngine->getIgnitionModule()->m_ccw = false;
+
     // Count the time from starting the engine
     if (countRuntime)
         runtime += dt;
 
     #pragma region 2step and 3 step
 
+    bool launchin = false;
+
     if (currentStatus.clutchEngagedRPM < (configPage6.flatSArm * 100) && m_targetClutchPressure <= 0.0 && tps >= (configPage10.lnchCtrlTPS / 255) && configPage6.launchEnabled) {
         m_iceEngine->getIgnitionModule()->m_2stepSoftCutAngle = configPage6.lnchRetard;
         m_iceEngine->getIgnitionModule()->m_2stepSoftCutLimit = configPage6.lnchSoftLim * 100;
         m_iceEngine->getIgnitionModule()->m_2stepHardCutLimit = configPage6.lnchHardLim * 100;
         m_iceEngine->getIgnitionModule()->m_2stepEnabled = true;
+        launchin = true;
     }
     else if (currentStatus.clutchEngagedRPM > (configPage6.flatSArm * 100) && m_targetClutchPressure <= 0.0 && configPage6.flatSEnable) {
         m_iceEngine->getIgnitionModule()->m_3stepSoftCutAngle = configPage6.flatSRetard;
         m_iceEngine->getIgnitionModule()->m_3stepSoftCutLimit = configPage6.flatSSoftWin * 100;
         m_iceEngine->getIgnitionModule()->m_3stepEnabled = true;
+        launchin = false;
     }
     else {
         m_iceEngine->getIgnitionModule()->m_2stepEnabled = false;
         m_iceEngine->getIgnitionModule()->m_3stepEnabled = false;
         m_iceEngine->getIgnitionModule()->m_retard = false;
         m_iceEngine->getIgnitionModule()->m_retardAmount = 0;
+        launchin = false;
     }
+    currentStatus.launchCorrection = m_iceEngine->getIgnitionModule()->m_retardAmount;
 
     #pragma endregion
 
@@ -1245,7 +1256,7 @@ void EngineSimApplication::ecmProcess(float dt) {
 
         // ASE Time setup
         aseTaperTime = configPage2.aseTaperTime / 10; // Config is in 100ms and not 1s
-        aseMaxTime = table2D_getValue(&ASECountTable, currentStatus.coolant); // Get regular time from table
+        aseMaxTime = table2D_getValue(&ASECountTable, currentStatus.coolant - CALIBRATION_TEMPERATURE_OFFSET); // Get regular time from table
         aseTime = aseTaperTime + aseMaxTime; // Combine time
         
         // enable runtime count thing
@@ -1276,8 +1287,8 @@ void EngineSimApplication::ecmProcess(float dt) {
 
     // Warmup Enrichment (WUE)
 
-    float wue = 1000;
-    if (currentStatus.coolant > (table2D_getAxisValue(&WUETable, 9) - CALIBRATION_TEMPERATURE_OFFSET)) {
+    float wue = 100;
+    if ((currentStatus.coolant - CALIBRATION_TEMPERATURE_OFFSET) > (table2D_getAxisValue(&WUETable, 9) - CALIBRATION_TEMPERATURE_OFFSET)) {
         //This prevents us doing the 2D lookup if we're already up to temp
         BIT_CLEAR(currentStatus.engine, BIT_ENGINE_WARMUP);
         wue = table2D_getRawValue(&WUETable, 9);
@@ -1306,9 +1317,15 @@ void EngineSimApplication::ecmProcess(float dt) {
     else {
         BIT_SET(currentStatus.engine, BIT_ENGINE_ASE);
     }
-    currentStatus.ASEValue = ase;
+    currentStatus.ASEValue = ase + 100;
     
-    correction = wue + ase;
+    float launchCorrection = 0;
+    // launch coorectionn
+    if (launchin) {
+        launchCorrection = configPage6.lnchFuelAdd;
+    }
+
+    correction = wue + ase + launchCorrection;
 
     BIT_CLEAR(currentStatus.status1, BIT_STATUS1_DFCO);
     if (configPage2.dfcoEnabled) {
@@ -1362,6 +1379,25 @@ void EngineSimApplication::ecmProcess(float dt) {
     currentStatus.PW6 = pw;
     currentStatus.PW7 = pw;
     currentStatus.PW8 = pw;
+
+    // vtec?
+    int vvtLoad = 0;
+
+    if (configPage6.vvtLoadSource == LOAD_SOURCE_MAP)
+        vvtLoad = currentStatus.MAP;
+    else if (configPage6.vvtLoadSource == LOAD_SOURCE_TPS)
+        vvtLoad = currentStatus.TPS * 2;
+    else if (configPage6.vvtLoadSource == LOAD_SOURCE_IMAPEMAP)
+        vvtLoad = (currentStatus.MAP * 100) / currentStatus.EMAP;
+    else { vvtLoad = currentStatus.MAP; }
+
+    currentStatus.vvt1Duty = get3DTableValue(&vvtTable, vvtLoad, currentStatus.RPM);
+    bool enableVtec = currentStatus.vvt1Duty > 50 && configPage6.vvtEnabled;
+    for (int i = 0; i < m_iceEngine->getCylinderBankCount(); i++) {
+        m_iceEngine->getHead(i)->getValvetrain()->m_vtecEnabled = enableVtec;
+        m_iceEngine->getHead(i)->getValvetrain()->m_vtecPct = currentStatus.vvt1Duty;
+    }
+
 }
 
 void EngineSimApplication::ecmStatus(float dt) {

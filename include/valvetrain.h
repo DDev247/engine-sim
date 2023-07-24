@@ -12,6 +12,9 @@ public:
 
     virtual Camshaft *getActiveIntakeCamshaft() = 0;
     virtual Camshaft *getActiveExhaustCamshaft() = 0;
+
+    bool m_vtecEnabled = false;
+    float m_vtecPct = 0.0f;
 };
 
 #endif /* ATG_ENGINE_SIM_VALVETRAIN_H */

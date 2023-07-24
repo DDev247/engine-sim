@@ -336,11 +336,14 @@ void PistonEngineSimulator::simulateStep_() {
     
     // for every degree of temp over 110c we add some friction to the engine
     if (m_blockTemperature >= 110) {
+        m_blockTemperature -= (m_engine->m_blockCoolRadiator * (units::toRpm(m_engine->getRpm()) / 5000)) * timestep;
+
         float diff = 110 - m_blockTemperature;
         float a = (diff / 140);
         for (int i = 0; i < m_engine->getCylinderCount(); i++) {
-            //float torque = a * m_engine->getCrankshaft(i)->m_initialFrictionTorque;
-            //m_engine->getCrankshaft(i)->m_frictionTorque = torque;
+            float torque = a * m_engine->getCrankshaft(i)->m_initialFrictionTorque;
+            m_engine->getCrankshaft(i)->m_frictionTorque = torque;
+
             float bb = a * m_engine->getPiston(i)->m_initialBlowby;
             bb *= 10;
             m_engine->getPiston(i)->m_blowby_k = bb;

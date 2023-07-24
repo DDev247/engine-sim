@@ -37,7 +37,7 @@ class EngineSimApplication {
         static std::string s_buildVersion;
 
     public:
-        EngineSimApplication();
+        EngineSimApplication(std::string comPort="COM3");
         virtual ~EngineSimApplication();
 
         static std::string getBuildVersion() { return s_buildVersion; }
