@@ -370,8 +370,8 @@ set_property(TARGET esrecord-beamng PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CM
 # versions
 target_compile_definitions(esrecord PUBLIC ES_RECORD_VERSION="0.1.0")
 target_compile_definitions(esrecord-beamng PUBLIC ES_RECORD_VERSION="0.1.0")
-target_compile_definitions(esrecord-lib PUBLIC ES_RECORD_VERSION="0.1.0")
-target_compile_definitions(esrecord-lib PUBLIC ES_RECORD_LIBRARY_VERSION=1000)
+target_compile_definitions(esrecord-lib PUBLIC ES_RECORD_VERSION="0.1.1")
+target_compile_definitions(esrecord-lib PUBLIC ES_RECORD_LIBRARY_VERSION=1010)
 
 # GTEST
 

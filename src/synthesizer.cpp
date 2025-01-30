@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <windows.h>
 
 #undef min
 #undef max

@@ -23,14 +23,14 @@
 #define ESRECORD_API extern "C" __declspec(dllexport)
 
 // define private binding variables
-extern Simulator* ESRecord_Simulator;
-extern Engine* ESRecord_Engine;
-extern Transmission* ESRecord_Transmission;
-extern Vehicle* ESRecord_Vehicle;
+extern Simulator* ESRecord_Simulator[];
+extern Engine* ESRecord_Engine[];
+extern Transmission* ESRecord_Transmission[];
+extern Vehicle* ESRecord_Vehicle[];
 
-ESRECORD_API bool ESRecord_Compile(const char* path);
-ESRECORD_API bool ESRecord_Initialise();
-ESRECORD_API double ESRecord_Update(float averagefps);
+ESRECORD_API bool ESRecord_Compile(int instanceId, const char* path);
+ESRECORD_API bool ESRecord_Initialise(int instanceId);
+ESRECORD_API double ESRecord_Update(int instanceId, float averagefps);
 
 enum ESRecordState {
 	ESRECORD_STATE_IDLE,
@@ -40,15 +40,15 @@ enum ESRecordState {
 	ESRECORD_STATE_RECORDING
 };
 
-extern ESRecordState ESRecord_CurrentState;
-extern int ESRecord_Progress;
+extern ESRecordState ESRecord_CurrentState[];
+extern int ESRecord_Progress[];
 
-ESRECORD_API ESRecordState ESRecord_GetState(int& progress);
+ESRECORD_API ESRecordState ESRecord_GetState(int instanceId, int& progress);
 ESRECORD_API int ESRecord_GetVersion();
 
-ESRECORD_API char* ESRecord_Engine_GetName();
-ESRECORD_API float ESRecord_Engine_GetRedline();
-ESRECORD_API float ESRecord_Engine_GetDisplacement();
+ESRECORD_API char* ESRecord_Engine_GetName(int instanceId=0);
+ESRECORD_API float ESRecord_Engine_GetRedline(int instanceId=0);
+ESRECORD_API float ESRecord_Engine_GetDisplacement(int instanceId=0);
 
 struct SampleConfig {
 	bool overrideRevlimit;
@@ -63,6 +63,6 @@ struct SampleResult {
 	long long millis;
 };
 
-ESRECORD_API SampleResult ESRecord_Record(SampleConfig config);
+ESRECORD_API SampleResult ESRecord_Record(int instanceId, SampleConfig config);
 
 #endif

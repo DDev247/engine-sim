@@ -6,16 +6,16 @@
 
 #include "esrecord_lib.h"
 
-Simulator* ESRecord_Simulator = nullptr;
-Engine* ESRecord_Engine = nullptr;
-Transmission* ESRecord_Transmission = nullptr;
-Vehicle* ESRecord_Vehicle = nullptr;
+Simulator* ESRecord_Simulator		[4];
+Engine* ESRecord_Engine				[4];
+Transmission* ESRecord_Transmission	[4];
+Vehicle* ESRecord_Vehicle			[4];
 
-ESRecordState ESRecord_CurrentState = ESRECORD_STATE_IDLE;
-int ESRecord_Progress = 0;
+ESRecordState ESRecord_CurrentState[4] = { ESRECORD_STATE_IDLE };
+int ESRecord_Progress[4] = { 0 };
 
-ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
-	ESRecord_CurrentState = ESRECORD_STATE_PREPARING;
+ESRECORD_API SampleResult ESRecord_Record(int instanceId, SampleConfig config) {
+	ESRecord_CurrentState[instanceId] = ESRECORD_STATE_PREPARING;
 	float throttleValue = (config.throttle / 100.0f);
 	SampleResult result;
 	result.power = 0;
@@ -67,19 +67,19 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 	
 	// initialise shit
-	ESRecord_Initialise(); // recreate simulation again
+	ESRecord_Initialise(instanceId); // recreate simulation again
 
-	ESRecord_Simulator->setSimulationFrequency(config.frequency);
-	ESRecord_Simulator->m_dyno.m_enabled = false; // afr fix
-	ESRecord_Simulator->m_dyno.m_hold = true;
-	ESRecord_Simulator->m_dyno.m_rotationSpeed = units::rpm(config.rpm);
+	ESRecord_Simulator[instanceId]->setSimulationFrequency(config.frequency);
+	ESRecord_Simulator[instanceId]->m_dyno.m_enabled = false; // afr fix
+	ESRecord_Simulator[instanceId]->m_dyno.m_hold = true;
+	ESRecord_Simulator[instanceId]->m_dyno.m_rotationSpeed = units::rpm(config.rpm);
 
-	ESRecord_Engine->setSpeedControl(1.0); // start engine
-	ESRecord_Simulator->m_starterMotor.m_enabled = true;
-	ESRecord_Simulator->getEngine()->getIgnitionModule()->m_enabled = true;
+	ESRecord_Engine[instanceId]->setSpeedControl(1.0); // start engine
+	ESRecord_Simulator[instanceId]->m_starterMotor.m_enabled = true;
+	ESRecord_Simulator[instanceId]->getEngine()->getIgnitionModule()->m_enabled = true;
 
 	if (config.overrideRevlimit)
-		ESRecord_Engine->getIgnitionModule()->setRevlimit(units::rpm(config.rpm + 1000));
+		ESRecord_Engine[instanceId]->getIgnitionModule()->setRevlimit(units::rpm(config.rpm + 1000));
 
 	int chunksRecorded = 0;
 	const int chunkTarget = 44100 * config.length;
@@ -88,15 +88,15 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 	int16_t *buffer = new int16_t[bufferSize];
 
 	// cycle the simulation for a bit
-	ESRecord_CurrentState = ESRECORD_STATE_WARMUP;
+	ESRecord_CurrentState[instanceId] = ESRECORD_STATE_WARMUP;
 	for (int i = 0; i < config.prerunCount; i++) {
-		ESRecord_Update(60.0f);
+		ESRecord_Update(instanceId, 60.0f);
 
 		// starter might skew the results
 		if(i > config.prerunCount / 2) {
-			ESRecord_Simulator->m_dyno.m_enabled = true;
-			ESRecord_Simulator->m_starterMotor.m_enabled = false;
-			ESRecord_Engine->setSpeedControl(throttleValue);
+			ESRecord_Simulator[instanceId]->m_dyno.m_enabled = true;
+			ESRecord_Simulator[instanceId]->m_starterMotor.m_enabled = false;
+			ESRecord_Engine[instanceId]->setSpeedControl(throttleValue);
 		}
 
 		if (i > config.prerunCount / 2 + config.prerunCount / 4) {
@@ -104,39 +104,39 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 			const double dt = (1.0 / 60.0); // 0.0166
 			const double alpha = dt / (dt + RC);
 
-			const double current_torque = units::convert(ESRecord_Simulator->getFilteredDynoTorque(), units::Nm);
-			const double current_power = units::convert(ESRecord_Simulator->getDynoPower(), units::hp);
+			const double current_torque = units::convert(ESRecord_Simulator[instanceId]->getFilteredDynoTorque(), units::Nm);
+			const double current_power = units::convert(ESRecord_Simulator[instanceId]->getDynoPower(), units::hp);
 
 			result.torque = (1 - alpha) * result.torque + alpha * current_torque;
 			result.power = (1 - alpha) * result.power + alpha * current_power;
 		}
 
-		int chunksThisFrame = ESRecord_Simulator->readAudioOutput(bufferSize, buffer);
-		ESRecord_Progress = (int)(((float)i / (float)config.prerunCount) * 100.0f);
+		int chunksThisFrame = ESRecord_Simulator[instanceId]->readAudioOutput(bufferSize, buffer);
+		ESRecord_Progress[instanceId] = (int)(((float)i / (float)config.prerunCount) * 100.0f);
 	}
 	//std::cout << "\33[2K\r";
 
 	// record
 
-	ESRecord_Progress = 0;
-	ESRecord_CurrentState = ESRECORD_STATE_RECORDING;
+	ESRecord_Progress[instanceId] = 0;
+	ESRecord_CurrentState[instanceId] = ESRECORD_STATE_RECORDING;
 	int simcalls = 0;
 	while (chunksRecorded < chunkTarget) {
-		ESRecord_Update(60.0f); simcalls++;
+		ESRecord_Update(instanceId, 60.0f); simcalls++;
 
 		{
 			constexpr double RC = 0.1;
 			const double dt = (1.0 / 60.0); // 0.0166
 			const double alpha = dt / (dt + RC);
 
-			const double current_torque = units::convert(ESRecord_Simulator->getFilteredDynoTorque(), units::Nm);
-			const double current_power = units::convert(ESRecord_Simulator->getDynoPower(), units::hp);
+			const double current_torque = units::convert(ESRecord_Simulator[instanceId]->getFilteredDynoTorque(), units::Nm);
+			const double current_power = units::convert(ESRecord_Simulator[instanceId]->getDynoPower(), units::hp);
 
 			result.torque = (1 - alpha) * result.torque + alpha * current_torque;
 			result.power = (1 - alpha) * result.power + alpha * current_power;
 		}
 
-		int chunksThisFrame = ESRecord_Simulator->readAudioOutput(bufferSize, buffer);
+		int chunksThisFrame = ESRecord_Simulator[instanceId]->readAudioOutput(bufferSize, buffer);
 
 		unsigned int length = chunksThisFrame;
 		if (chunksRecorded + chunksThisFrame > chunkTarget) {
@@ -148,7 +148,7 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 		fileSizeData += length * (sizeof int16_t);
 
 		chunksRecorded += length;
-		ESRecord_Progress = (int)(((float)chunksRecorded / (float)chunkTarget) * 100.0f);
+		ESRecord_Progress[instanceId] = (int)(((float)chunksRecorded / (float)chunkTarget) * 100.0f);
 	}
 	
 	OutputDebugString(L"Recording done\n");
@@ -179,9 +179,9 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 
 		// album
 		outputFile << "IPRD"; fileSize += 4; infoSize += 4; // chunk header
-		len = ESRecord_Engine->getName().size() + 1; // chunk size
+		len = ESRecord_Engine[instanceId]->getName().size() + 1; // chunk size
 		outputFile.write((const char*)(&len), sizeof(int32_t)); fileSize += sizeof(int32_t); infoSize += sizeof(int32_t);
-		outputFile.write(ESRecord_Engine->getName().c_str(), len); fileSize += len; infoSize += len;
+		outputFile.write(ESRecord_Engine[instanceId]->getName().c_str(), len); fileSize += len; infoSize += len;
 
 		// write chunk size
 		outputFile.seekp(pos, std::ios::beg);
@@ -201,7 +201,7 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	
-	ESRecord_CurrentState = ESRECORD_STATE_IDLE;
+	ESRecord_CurrentState[instanceId] = ESRECORD_STATE_IDLE;
 	// todo?
 	long long millis = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 	float ratio = (float)config.length / ((float)millis / 1000.0f);
@@ -212,92 +212,33 @@ ESRECORD_API SampleResult ESRecord_Record(SampleConfig config) {
 	return result;
 }
 
-ESRECORD_API ESRecordState ESRecord_GetState(int& progress) {
-	progress = ESRecord_Progress;
-	return ESRecord_CurrentState;
+ESRECORD_API ESRecordState ESRecord_GetState(int instanceId, int& progress) {
+	progress = ESRecord_Progress[instanceId];
+	return ESRecord_CurrentState[instanceId];
 }
 
 ESRECORD_API int ESRecord_GetVersion() {
 	return ES_RECORD_LIBRARY_VERSION;
 }
 
-ESRECORD_API char* ESRecord_Engine_GetName() {
+ESRECORD_API char* ESRecord_Engine_GetName(int instanceId) {
 	if (ESRecord_Engine != nullptr) {
-		char* cstr = new char[ESRecord_Engine->getName().length() + 1];
-		strcpy(cstr, ESRecord_Engine->getName().c_str());
+		char* cstr = new char[ESRecord_Engine[instanceId]->getName().length() + 1];
+		strcpy(cstr, ESRecord_Engine[instanceId]->getName().c_str());
 		return cstr;
 	}
 
 	return "";
 }
 
-ESRECORD_API float ESRecord_Engine_GetRedline() {
+ESRECORD_API float ESRecord_Engine_GetRedline(int instanceId) {
 	if (ESRecord_Engine != nullptr)
-		return units::toRpm(ESRecord_Engine->getRedline());
+		return units::toRpm(ESRecord_Engine[instanceId]->getRedline());
 	return -1.0f;
 }
 
-ESRECORD_API float ESRecord_Engine_GetDisplacement() {
+ESRECORD_API float ESRecord_Engine_GetDisplacement(int instanceId) {
 	if (ESRecord_Engine != nullptr)
-		return (float)units::convert(ESRecord_Engine->getDisplacement(), units::L);
+		return (float)units::convert(ESRecord_Engine[instanceId]->getDisplacement(), units::L);
 	return -1.0f;
 }
-
-/*int main()
-{
-	enableAnsi();
-	std::cout << "ES-Record v" ES_RECORD_VERSION << std::endl;
-	std::cout << "Reading configuration..." << std::endl;
-
-	Config config;
-	bool success = loadConfig(config);
-
-	if (!success) {
-		std::cout << "Failed to load configuration" << std::endl;
-		return 1;
-	}
-
-	loadES();
-
-	std::ofstream dynoCurve("dyno.csv");
-	if (!dynoCurve.is_open()) {
-		std::cout << "Failed to open dyno.csv, continuing without dyno curve." << std::endl;
-	}
-
-	if (dynoCurve.is_open()) {
-		dynoCurve << "rpm,throttle,power_hp,torque_nm" << std::endl;
-		dynoCurve << std::setprecision(3);
-	}
-
-	for (int i = 0; i < config.sampleCount; i++) {
-		for (int j = 0; j < config.sampleThrottleValuesCount; j++) {
-			SampleConfig sample;
-			sample.prerunCount = config.prerunCount;
-			sample.rpm = config.sampleRPMValues[i];
-			sample.throttle = config.sampleThrottleValues[j];
-			sample.frequency = config.sampleRPMFrequencyValues[i];
-			sample.length = config.sampleLength;
-			sample.overrideRevlimit = config.overrideRevlimit;
-
-			sample.output = "../samples/output-" + std::to_string(sample.rpm) + "-" + std::to_string(sample.throttle) + ".wav";
-
-			float power = 0;
-			float torque = 0;
-			recordSample(sample, power, torque);
-
-			if (dynoCurve.is_open())
-				dynoCurve << sample.rpm << "," << sample.throttle << "," << power << "," << torque << std::endl;
-		}
-	}
-
-	dynoCurve.flush();
-	dynoCurve.close();
-
-	delete[] config.sampleRPMValues;
-	delete[] config.sampleRPMFrequencyValues;
-	delete[] config.sampleThrottleValues;
-
-	std::cout << "Done" << std::endl;
-
-	return 0;
-}*/

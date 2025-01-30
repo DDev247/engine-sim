@@ -31,7 +31,7 @@ namespace es_script {
 
         static Output *output();
 
-        void initialize();
+        void initialize(int instanceId);
         bool compile(const piranha::IrPath &path);
         Output execute();
         void destroy();
@@ -43,6 +43,7 @@ namespace es_script {
         LanguageRules m_rules;
         piranha::Compiler *m_compiler;
         piranha::NodeProgram m_program;
+        int m_instanceId;
     };
 
 } /* namespace es_script */
