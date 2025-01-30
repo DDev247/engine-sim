@@ -39,6 +39,8 @@ class IgnitionModule : public Part {
 
         double getTimingAdvance();
 
+        inline void setRevlimit(double revlimit) { m_revLimit = revlimit; };
+
         bool m_enabled;
 
     protected:

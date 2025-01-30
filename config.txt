@@ -1,0 +1,29 @@
+# Config file for es-record
+# do not change the order of the values, thats important
+# in the comma separated values there must be a trailing comma
+
+# Simulator "precook" amount
+# The amount of times process() is called before recording
+# I don't know what is the best value for this but i think it depends on the simulation frequency
+# this should also be enough for the engine to start within half of this
+100
+
+# Sample length (seconds, integer)
+5
+
+# Sample count
+17
+# Sample RPM values separated by comma
+500,900,1300,1700,2100,2500,2900,3300,3700,4100,4500,4900,5300,5700,6100,6500,6900,
+# Sample Frequencies (per RPM value) separated by comma
+# there must be the same number of frequencies as there is RPM values
+10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,
+
+# Sample throttle count
+2
+# Sample throttle values separated by comma
+0,100,
+
+# Disable revlimiter? (sets the revlimiter to 'sample rpm + 1000')
+# true/false
+true

@@ -99,7 +99,7 @@ void EngineSimApplication::initialize(void *instance, ysContextObject::DeviceAPI
 
         std::getline(confFile, enginePath);
         std::getline(confFile, m_assetPath);
-        enginePath = modulePath.Append(enginePath).ToString();
+        enginePath = modulePath.Append(enginePath.c_str()).ToString();
         m_assetPath = modulePath.Append(m_assetPath).ToString();
 
         confFile.close();

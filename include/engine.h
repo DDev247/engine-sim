@@ -44,6 +44,7 @@ class Engine : public Part {
             double initialHighFrequencyGain;
             double initialNoise;
             double initialJitter;
+            double initialConvolution;
         };
 
     public:
@@ -106,6 +107,7 @@ class Engine : public Part {
         double getInitialHighFrequencyGain() const { return m_initialHighFrequencyGain; }
         double getInitialNoise() const { return m_initialNoise; }
         double getInitialJitter() const { return m_initialJitter; }
+        double getInitialConvolution() const { return m_initialConvolution; }
 
         virtual Simulator *createSimulator(Vehicle *vehicle, Transmission *transmission);
 
@@ -135,6 +137,7 @@ class Engine : public Part {
         double m_initialHighFrequencyGain;
         double m_initialNoise;
         double m_initialJitter;
+        double m_initialConvolution;
 
         ExhaustSystem *m_exhaustSystems;
         int m_exhaustSystemCount;

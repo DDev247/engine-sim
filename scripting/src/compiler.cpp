@@ -25,6 +25,7 @@ void es_script::Compiler::initialize() {
     m_compiler->addSearchPath("../../es/");
     m_compiler->addSearchPath("../es/");
     m_compiler->addSearchPath("es/");
+    m_compiler->addSearchPath("es/es/");
 
     m_rules.initialize();
 }

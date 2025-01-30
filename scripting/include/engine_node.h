@@ -164,6 +164,7 @@ namespace es_script {
             addInput("hf_gain", &m_parameters.initialHighFrequencyGain);
             addInput("jitter", &m_parameters.initialJitter);
             addInput("noise", &m_parameters.initialNoise);
+            addInput("convolution", &m_parameters.initialConvolution);
 
             ObjectReferenceNode<EngineNode>::registerInputs();
         }

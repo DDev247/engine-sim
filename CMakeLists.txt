@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 option(DTV "Enable video output" OFF)
 option(PIRANHA_ENABLED "Enable scripting input" ON)
-option(DISCORD_ENABLED "Enable Discord Rich Presence" ON)
+option(DISCORD_ENABLED "Enable Discord Rich Presence" OFF)
 
 if (DTV)
     add_compile_definitions(ATG_ENGINE_SIM_VIDEO_CAPTURE)
@@ -41,6 +41,31 @@ set_property(TARGET gmock PROPERTY FOLDER "gtest")
 set_property(TARGET gmock_main PROPERTY FOLDER "gtest")
 set_property(TARGET gtest PROPERTY FOLDER "gtest")
 set_property(TARGET gtest_main PROPERTY FOLDER "gtest")
+
+# ========================================================
+# DEPS
+
+set(SDL2_INCLUDE_DIR C:/dev/dependencies/SDL2/include)
+set(SDL2_LIBRARY C:/dev/dependencies/SDL2/lib/x64/SDL2.lib)
+set(SDL2_DIR C:/dev/dependencies/SDL2)
+set(SDL2MAIN_LIBRARY C:/dev/dependencies/SDL2/lib/x64/SDL2main.lib)
+
+set(SDL2_IMAGE_INCLUDE_DIR C:/dev/dependencies/SDL2_image/include)
+set(SDL2_IMAGE_LIBRARY C:/dev/dependencies/SDL2_image/lib/x64/SDL2_image.lib)
+
+set(Boost_DIR C:/dev/dependencies/Boost_1_80_0)
+set(Boost_INCLUDE_DIR C:/dev/dependencies/Boost_1_80_0)
+set(Boost_FILESYSTEM_LIBRARY_RELEASE C:/dev/dependencies/Boost_1_80_0/lib64-msvc-14.3/libboost_filesystem-vc143-mt-x64-1_80.lib)
+set(Boost_FILESYSTEM_LIBRARY_DEBUG C:/dev/dependencies/Boost_1_80_0/lib64-msvc-14.3/libboost_filesystem-vc143-mt-gd-x64-1_80.lib)
+set(Boost_LIBRARY_DIR_DEBUG C:/dev/dependencies/Boost_1_80_0/lib64-msvc-14.3)
+set(Boost_LIBRARY_DIR_RELEASE C:/dev/dependencies/Boost_1_80_0/lib64-msvc-14.3)
+
+set(FLEX_EXECUTABLE C:/dev/dependencies/flexbison/win_flex.exe)
+set(BISON_EXECUTABLE C:/dev/dependencies/flexbison/win_bison.exe)
+
+include_directories(${Boost_INCLUDE_DIR})
+include_directories(${SDL2_INCLUDE_DIR})
+include_directories(${SDL2_IMAGE_INCLUDE_DIR})
 
 # ========================================================
 
@@ -132,7 +157,7 @@ add_library(engine-sim STATIC
     include/vehicle.h
     include/vehicle_drag_constraint.h
     include/vtec_valvetrain.h
-)
+ )
 
 target_link_libraries(engine-sim
     simple-2d-constraint-solver
@@ -181,7 +206,7 @@ if (PIRANHA_ENABLED)
         scripting/include/valvetrain_node.h
         scripting/include/vtec_valvetrain_node.h
 		scripting/include/vehicle_node.h
-    )
+     )
 
     target_include_directories(engine-sim-script-interpreter
         PUBLIC dependencies/submodules)
@@ -191,115 +216,162 @@ if (PIRANHA_ENABLED)
         piranha)
 endif (PIRANHA_ENABLED)
 
-if (DISCORD_ENABLED)
-    add_library(discord STATIC
-        # Source files
-        dependencies/discord/Discord.cpp
+#if (DISCORD_ENABLED)
+#    add_library(discord STATIC
+#        # Source files
+#        dependencies/discord/Discord.cpp
+#
+#        # Include files
+#        dependencies/discord/Discord.h
+#        dependencies/discord/discord_register.h
+#        dependencies/discord/discord_rpc.h
+#    )
+#endif (DISCORD_ENABLED)
+#
+#add_executable(engine-sim-app WIN32
+#    # Source files
+#    src/main.cpp
+#    src/engine_sim_application.cpp
+#    src/geometry_generator.cpp
+#    src/simulation_object.cpp
+#    src/piston_object.cpp
+#    src/connecting_rod_object.cpp
+#    src/ui_element.cpp
+#    src/ui_manager.cpp
+#    src/cylinder_pressure_gauge.cpp
+#    src/ui_math.cpp
+#    src/gauge.cpp
+#    src/crankshaft_object.cpp
+#    src/cylinder_bank_object.cpp
+#    src/cylinder_head_object.cpp
+#    src/ui_button.cpp
+#    src/ui_utilities.cpp
+#    src/combustion_chamber_object.cpp
+#    src/oscilloscope.cpp
+#    src/shaders.cpp
+#    src/engine_view.cpp
+#    src/right_gauge_cluster.cpp
+#    src/cylinder_temperature_gauge.cpp
+#    src/labeled_gauge.cpp
+#    src/throttle_display.cpp
+#    src/afr_cluster.cpp
+#    src/fuel_cluster.cpp
+#    src/oscilloscope_cluster.cpp
+#    src/performance_cluster.cpp
+#    src/firing_order_display.cpp
+#    src/load_simulation_cluster.cpp
+#    src/mixer_cluster.cpp
+#    src/info_cluster.cpp
+#
+#    # Include files
+#    include/delta.h
+#    include/dtv.h
+#    include/engine_sim_application.h
+#    include/geometry_generator.h
+#    include/simulation_object.h
+#    include/piston_object.h
+#    include/connecting_rod_object.h
+#    include/ui_element.h
+#    include/ui_manager.h
+#    include/cylinder_pressure_gauge.h
+#    include/ui_math.h
+#    include/units.h
+#    include/crankshaft_object.h
+#    include/cylinder_bank_object.h
+#    include/cylinder_head_object.h
+#    include/ui_button.h
+#    include/ui_utilities.h
+#    include/combustion_chamber_object.h
+#    include/oscilloscope.h
+#    include/shaders.h
+#    include/engine_view.h
+#    include/right_gauge_cluster.h
+#    include/cylinder_temperature_gauge.h
+#    include/labeled_gauge.h
+#    include/throttle_display.h
+#    include/afr_cluster.h
+#    include/fuel_cluster.h
+#    include/oscilloscope_cluster.h
+#    include/performance_cluster.h
+#    include/firing_order_display.h
+#    include/load_simulation_cluster.h
+#    include/mixer_cluster.h
+#    include/info_cluster.h
+#)
 
-        # Include files
-        dependencies/discord/Discord.h
-        dependencies/discord/discord_register.h
-        dependencies/discord/discord_rpc.h
-    )
-endif (DISCORD_ENABLED)
+#target_link_libraries(engine-sim-app
+   #engine-sim
+#)
 
-add_executable(engine-sim-app WIN32
-    # Source files
-    src/main.cpp
-    src/engine_sim_application.cpp
-    src/geometry_generator.cpp
-    src/simulation_object.cpp
-    src/piston_object.cpp
-    src/connecting_rod_object.cpp
-    src/ui_element.cpp
-    src/ui_manager.cpp
-    src/cylinder_pressure_gauge.cpp
-    src/ui_math.cpp
-    src/gauge.cpp
-    src/crankshaft_object.cpp
-    src/cylinder_bank_object.cpp
-    src/cylinder_head_object.cpp
-    src/ui_button.cpp
-    src/ui_utilities.cpp
-    src/combustion_chamber_object.cpp
-    src/oscilloscope.cpp
-    src/shaders.cpp
-    src/engine_view.cpp
-    src/right_gauge_cluster.cpp
-    src/cylinder_temperature_gauge.cpp
-    src/labeled_gauge.cpp
-    src/throttle_display.cpp
-    src/afr_cluster.cpp
-    src/fuel_cluster.cpp
-    src/oscilloscope_cluster.cpp
-    src/performance_cluster.cpp
-    src/firing_order_display.cpp
-    src/load_simulation_cluster.cpp
-    src/mixer_cluster.cpp
-    src/info_cluster.cpp
-
-    # Include files
-    include/delta.h
-    include/dtv.h
-    include/engine_sim_application.h
-    include/geometry_generator.h
-    include/simulation_object.h
-    include/piston_object.h
-    include/connecting_rod_object.h
-    include/ui_element.h
-    include/ui_manager.h
-    include/cylinder_pressure_gauge.h
-    include/ui_math.h
-    include/units.h
-    include/crankshaft_object.h
-    include/cylinder_bank_object.h
-    include/cylinder_head_object.h
-    include/ui_button.h
-    include/ui_utilities.h
-    include/combustion_chamber_object.h
-    include/oscilloscope.h
-    include/shaders.h
-    include/engine_view.h
-    include/right_gauge_cluster.h
-    include/cylinder_temperature_gauge.h
-    include/labeled_gauge.h
-    include/throttle_display.h
-    include/afr_cluster.h
-    include/fuel_cluster.h
-    include/oscilloscope_cluster.h
-    include/performance_cluster.h
-    include/firing_order_display.h
-    include/load_simulation_cluster.h
-    include/mixer_cluster.h
-    include/info_cluster.h
-)
-
-target_link_libraries(engine-sim-app
-    engine-sim
-)
-
-if (DTV)
-    target_link_libraries(engine-sim-app
-        direct-to-video)
-endif (DTV)
-
-if (PIRANHA_ENABLED)
-    target_link_libraries(engine-sim-app
-        engine-sim-script-interpreter)
-endif (PIRANHA_ENABLED)
-
-if (DISCORD_ENABLED)
-    add_library(discord-rpc STATIC IMPORTED)
-    set_property(TARGET discord-rpc PROPERTY IMPORTED_LOCATION ${PROJECT_SOURCE_DIR}/dependencies/discord/lib/discord-rpc.lib)
-    target_link_libraries(engine-sim-app
-    	discord
-	discord-rpc)
-endif (DISCORD_ENABLED)
-
-target_include_directories(engine-sim-app
-    PUBLIC dependencies/submodules)
+#if (DTV)
+#    target_link_libraries(engine-sim-app
+#        direct-to-video)
+#endif (DTV)
+#
+#if (PIRANHA_ENABLED)
+#    target_link_libraries(engine-sim-app
+#        engine-sim-script-interpreter)
+#endif (PIRANHA_ENABLED)
+#
+#if (DISCORD_ENABLED)
+#    add_library(discord-rpc STATIC IMPORTED)
+#    set_property(TARGET discord-rpc PROPERTY IMPORTED_LOCATION ${PROJECT_SOURCE_DIR}/dependencies/discord/lib/discord-rpc.lib)
+#    target_link_libraries(engine-sim-app
+#    	discord
+#	discord-rpc)
+#endif (DISCORD_ENABLED)
+#
+#target_include_directories(engine-sim-app
+#    PUBLIC dependencies/submodules)
 
 add_subdirectory(dependencies)
+
+# ES-BRIDGE
+
+add_library(esbridge SHARED
+    "bridge/esbridge.cpp"
+ "bridge/esbridge.h" "bridge/esbridge_engine.cpp")
+
+ target_link_libraries(esbridge engine-sim engine-sim-script-interpreter delta-basic)
+ 
+target_include_directories(esbridge
+    PUBLIC dependencies/submodules)
+
+# ES-RECORD
+
+add_executable(esrecord
+    "recorder/esrecord_main.cpp" "recorder/esrecord.h" "recorder/esrecord_engine.cpp" "recorder/esrecord_config.cpp" "recorder/esrecord_config.h" )
+    
+ target_link_libraries(esrecord engine-sim engine-sim-script-interpreter delta-basic)
+ 
+target_include_directories(esrecord
+    PUBLIC dependencies/submodules)
+
+set_property(TARGET esrecord PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+# ES-RECORD library
+
+
+add_library(esrecord-lib SHARED
+    "recorder-lib/esrecord_lib.cpp" "recorder-lib/esrecord_lib.h" "recorder-lib/esrecord_engine.cpp" )
+    
+ target_link_libraries(esrecord-lib engine-sim engine-sim-script-interpreter delta-basic)
+ 
+target_include_directories(esrecord-lib
+    PUBLIC dependencies/submodules)
+
+# ES-RECORD BeamNG.drive converter
+
+add_executable(esrecord-beamng
+    "recorder-beamng/esrecord_beamng_main.cpp" "recorder-beamng/esrecord_beamng.h" "recorder/esrecord_config.cpp" "recorder/esrecord_config.h")
+
+set_property(TARGET esrecord-beamng PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+# versions
+target_compile_definitions(esrecord PUBLIC ES_RECORD_VERSION="0.1.0")
+target_compile_definitions(esrecord-beamng PUBLIC ES_RECORD_VERSION="0.1.0")
+target_compile_definitions(esrecord-lib PUBLIC ES_RECORD_VERSION="0.1.0")
+target_compile_definitions(esrecord-lib PUBLIC ES_RECORD_LIBRARY_VERSION=1000)
 
 # GTEST
 

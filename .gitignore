@@ -10,3 +10,8 @@ compile_commands.json
 
 # Blender temporary files
 *.blend1
+
+.vs/
+error_log.log
+/samples
+script.js
