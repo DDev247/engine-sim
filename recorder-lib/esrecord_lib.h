@@ -43,6 +43,7 @@ enum ESRecordState {
 extern ESRecordState ESRecord_CurrentState[];
 extern int ESRecord_Progress[];
 
+ESRECORD_API bool ESRecord_GetSimState(int instanceId);
 ESRECORD_API ESRecordState ESRecord_GetState(int instanceId, int& progress);
 ESRECORD_API int ESRecord_GetVersion();
 

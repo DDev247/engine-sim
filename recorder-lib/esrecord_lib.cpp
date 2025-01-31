@@ -6,13 +6,15 @@
 
 #include "esrecord_lib.h"
 
-Simulator* ESRecord_Simulator		[4];
-Engine* ESRecord_Engine				[4];
-Transmission* ESRecord_Transmission	[4];
-Vehicle* ESRecord_Vehicle			[4];
+#define MAX_INSTANCES 8
 
-ESRecordState ESRecord_CurrentState[4] = { ESRECORD_STATE_IDLE };
-int ESRecord_Progress[4] = { 0 };
+Simulator* ESRecord_Simulator		[MAX_INSTANCES];
+Engine* ESRecord_Engine				[MAX_INSTANCES];
+Transmission* ESRecord_Transmission	[MAX_INSTANCES];
+Vehicle* ESRecord_Vehicle			[MAX_INSTANCES];
+
+ESRecordState ESRecord_CurrentState[MAX_INSTANCES] = { ESRECORD_STATE_IDLE };
+int ESRecord_Progress[MAX_INSTANCES] = { 0 };
 
 ESRECORD_API SampleResult ESRecord_Record(int instanceId, SampleConfig config) {
 	ESRecord_CurrentState[instanceId] = ESRECORD_STATE_PREPARING;
@@ -210,6 +212,16 @@ ESRECORD_API SampleResult ESRecord_Record(int instanceId, SampleConfig config) {
 
 	result.success = true;
 	return result;
+}
+
+ESRECORD_API bool ESRecord_GetSimState(int instanceId) {
+	if (ESRecord_Simulator[instanceId] != nullptr &&
+		ESRecord_Engine[instanceId] != nullptr &&
+		ESRecord_Transmission[instanceId] != nullptr &&
+		ESRecord_Vehicle[instanceId] != nullptr) {
+		return true;
+	}
+	return false;
 }
 
 ESRECORD_API ESRecordState ESRecord_GetState(int instanceId, int& progress) {
