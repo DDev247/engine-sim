@@ -153,7 +153,7 @@ ESRECORD_API SampleResult ESRecord_Record(int instanceId, SampleConfig config) {
 		ESRecord_Progress[instanceId] = (int)(((float)chunksRecorded / (float)chunkTarget) * 100.0f);
 	}
 	
-	OutputDebugString(L"Recording done\n");
+	OutputDebugStringW(L"Recording done\n");
 
 	// write INFO chunk
 	{

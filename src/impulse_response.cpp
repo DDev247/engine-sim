@@ -12,6 +12,6 @@ void ImpulseResponse::initialize(
     const std::string &filename,
     double volume)
 {
-    m_filename = std::wstring(filename.begin(), filename.end());
+    m_filename = std::string(filename.begin(), filename.end());
     m_volume = volume;
 }

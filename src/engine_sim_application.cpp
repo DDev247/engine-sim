@@ -622,7 +622,7 @@ void EngineSimApplication::loadScript() {
 
 #ifdef ATG_ENGINE_SIM_PIRANHA_ENABLED
     es_script::Compiler compiler;
-    compiler.initialize();
+    compiler.initialize(0);
     const bool compiled = compiler.compile("../assets/main.mr");
     if (compiled) {
         const es_script::Compiler::Output output = compiler.execute();

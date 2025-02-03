@@ -9,11 +9,11 @@ public:
     virtual ~ImpulseResponse();
 
     void initialize(const std::string &filename, double volume);
-    std::wstring getFilename() const { return m_filename; }
+    std::string getFilename() const { return m_filename; }
     double getVolume() const { return m_volume; }
 
 protected:
-    std::wstring m_filename;
+    std::string m_filename;
     double m_volume;
 };
 

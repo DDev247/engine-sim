@@ -7,6 +7,17 @@
 #include <cfloat>
 #include <cmath>
 
+#include <immintrin.h>
+#define SQRT(x) __sqrt_sd(x)
+
+inline double d_pow(double x, double y) {
+    static double xy[2];
+    _mm_storeu_pd(xy, _mm_pow_pd(_mm_set1_pd(x), _mm_set1_pd(y)));
+    return xy[0];
+}
+
+#define POW(x, y) d_pow(x, y)
+
 class GasSystem {
     public:
         struct Mix {
@@ -130,13 +141,13 @@ inline constexpr double GasSystem::heatCapacityRatio(int degreesOfFreedom) {
 
 inline double GasSystem::chokedFlowLimit(int degreesOfFreedom) {
     const double hcr = heatCapacityRatio(degreesOfFreedom);
-    return std::pow((2.0 / (hcr + 1)), hcr / (hcr - 1));
+    return POW((2.0 / (hcr + 1)), hcr / (hcr - 1));
 }
 
 inline double GasSystem::chokedFlowRate(int degreesOfFreedom) {
     const double hcr = heatCapacityRatio(degreesOfFreedom);
     double flowRate =
-        std::sqrt(hcr) * std::pow(2 / (hcr + 1), (hcr + 1) / (2 * (hcr - 1)));
+        SQRT(hcr) * POW(2 / (hcr + 1), (hcr + 1) / (2 * (hcr - 1)));
 
     return flowRate;
 }
@@ -167,7 +178,7 @@ inline double GasSystem::c() const {
     const double hcr = heatCapacityRatio();
     const double staticPressure = pressure();
     const double density = approximateDensity();
-    const double c = std::sqrt(staticPressure * hcr / density);
+    const double c = SQRT(staticPressure * hcr / density);
 
     return c;
 }
@@ -229,7 +240,7 @@ inline double GasSystem::dynamicPressure(double dx, double dy) const {
         x_d = x;
     }
 
-    return staticPressure * (std::sqrt(x_d) - 1);
+    return staticPressure * (SQRT(x_d) - 1);
 }
 
 inline double GasSystem::mass() const {

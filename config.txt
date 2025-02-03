@@ -12,17 +12,20 @@
 5
 
 # Sample count
-17
+#17
+1
 # Sample RPM values separated by comma
-500,900,1300,1700,2100,2500,2900,3300,3700,4100,4500,4900,5300,5700,6100,6500,6900,
+#500,900,1300,1700,2100,2500,2900,3300,3700,4100,4500,4900,5300,5700,6100,6500,6900,
+1000,
 # Sample Frequencies (per RPM value) separated by comma
 # there must be the same number of frequencies as there is RPM values
-10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,
+44100,
+#10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,10000,
 
 # Sample throttle count
-2
+1
 # Sample throttle values separated by comma
-0,100,
+100,
 
 # Disable revlimiter? (sets the revlimiter to 'sample rpm + 1000')
 # true/false

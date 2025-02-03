@@ -8,7 +8,7 @@ void initialise(const char* path) {
     Transmission* transmission = nullptr;
 
     es_script::Compiler compiler;
-    compiler.initialize();
+    compiler.initialize(0);
     const bool compiled = compiler.compile(path);
     if (compiled) {
         const es_script::Compiler::Output output = compiler.execute();

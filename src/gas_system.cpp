@@ -5,6 +5,9 @@
 
 #include <cmath>
 #include <cassert>
+#include <algorithm>
+
+#define SIMD true
 
 void GasSystem::setGeometry(double width, double height, double dx, double dy) {
     m_width = width;
@@ -44,7 +47,7 @@ void GasSystem::setN(double n) {
 
 void GasSystem::changeVolume(double dV) {
     const double V = this->volume();
-    const double L = std::pow(V + dV, 1 / 3.0);
+    const double L = POW(V + dV, 1 / 3.0);
     const double surfaceArea = (L * L);
     const double dL = -dV / surfaceArea;
     const double W = dL * pressure() * surfaceArea;
@@ -139,23 +142,23 @@ double GasSystem::flowConstant(
     const double p_0 = P, p_T = P - pressureDrop; // p_0 = upstream pressure
 
     const double chokedFlowLimit =
-        std::pow((2.0 / (hcr + 1)), hcr / (hcr - 1));
+        POW((2.0 / (hcr + 1)), hcr / (hcr - 1));
     const double p_ratio = p_T / p_0;
 
     double flowRate = 0;
     if (p_ratio <= chokedFlowLimit) {
         // Choked flow
-        flowRate = std::sqrt(hcr);
-        flowRate *= std::pow(2 / (hcr + 1), (hcr + 1) / (2 * (hcr - 1)));
+        flowRate = SQRT(hcr); 
+        flowRate *= POW(2 / (hcr + 1), (hcr + 1) / (2 * (hcr - 1)));
     }
     else {
         flowRate = (2 * hcr) / (hcr - 1);
-        flowRate *= (1 - std::pow(p_ratio, (hcr - 1) / hcr));
-        flowRate = std::sqrt(flowRate);
-        flowRate *= std::pow(p_ratio, 1 / hcr);
+        flowRate *= (1 - POW(p_ratio, (hcr - 1) / hcr));
+        flowRate = SQRT(flowRate);
+        flowRate *= POW(p_ratio, 1 / hcr);
     }
 
-    flowRate *= p_0 / std::sqrt(constants::R * T_0);
+    flowRate *= p_0 / SQRT(constants::R * T_0);
 
     return targetFlowRate / flowRate;
 }
@@ -213,15 +216,16 @@ double GasSystem::flowRate(
     if (p_ratio <= chokedFlowLimit) {
         // Choked flow
         flowRate = chokedFlowRateCached;
-        flowRate /= std::sqrt(constants::R * T_0);
+        flowRate /= SQRT(constants::R * T_0);
     }
     else {
-        const double s = std::pow(p_ratio, 1 / hcr);
+        const double s = POW(p_ratio, 1 / hcr);
 
         flowRate = (2 * hcr) / (hcr - 1);
         flowRate *= s * (s - p_ratio);
-        flowRate = std::sqrt(std::fmax(flowRate, 0.0) / (constants::R * T_0));
+        flowRate = SQRT(std::fmax(flowRate, 0.0) / (constants::R * T_0));
     }
+
 
     flowRate *= direction * p_0;
 
@@ -270,7 +274,7 @@ void GasSystem::dissipateExcessVelocity() {
     }
 
     const double k_squared = c_squared / v_squared;
-    const double k = std::sqrt(k_squared);
+    const double k = SQRT(k_squared);
 
     m_state.momentum[0] *= k;
     m_state.momentum[1] *= k;
@@ -287,6 +291,86 @@ void GasSystem::updateVelocity(double dt, double beta) {
     
     double d_momentum_x = 0;
     double d_momentum_y = 0;
+
+#if SIMD
+
+    const double pp[] = {
+        dynamicPressure(m_dx, m_dy),
+        dynamicPressure(-m_dx, -m_dy),
+        dynamicPressure(m_dy, m_dx),
+        dynamicPressure(-m_dy, -m_dx)
+    };
+
+    __m256d p = _mm256_loadu_pd(pp);
+
+    const double p_sa_p[] = {
+        m_height,
+        m_height,
+        m_width,
+        m_width
+    };
+
+    __m256d p_sa = _mm256_loadu_pd(p_sa_p);
+    __m256d p_sa_mod = _mm256_mul_pd(p_sa, _mm256_set1_pd(depth));
+
+    __m256d p_mod = _mm256_mul_pd(p, p_sa_mod);
+
+    const double momentum_px[] = {
+        m_dx, m_dx, m_dy, m_dy
+    };
+    const double momentum_py[] = {
+        m_dy, m_dy, m_dx, m_dx
+    };
+
+    __m256d momentum_x = _mm256_loadu_pd(momentum_px);
+    __m256d momentum_y = _mm256_loadu_pd(momentum_py);
+
+    __m256d result_x = _mm256_mul_pd(p_mod, momentum_x);
+    __m256d result_y = _mm256_mul_pd(p_mod, momentum_y);
+
+    double momentum_result[4];
+    _mm256_storeu_pd(momentum_result, result_x);
+
+    d_momentum_x += momentum_result[0];
+    d_momentum_x -= momentum_result[1];
+    d_momentum_x += momentum_result[2];
+    d_momentum_x -= momentum_result[3];
+
+    _mm256_storeu_pd(momentum_result, result_y);
+    d_momentum_y += momentum_result[0];
+    d_momentum_y -= momentum_result[1];
+    d_momentum_y += momentum_result[2];
+    d_momentum_y -= momentum_result[3];
+
+    __m128d m = _mm_set1_pd(mass());
+    __m128d inv_mass = _mm_div_pd(_mm_set1_pd(1), m);
+
+    __m128d state_momentum = _mm_loadu_pd(m_state.momentum);
+    __m128d v0 = _mm_mul_pd(state_momentum, inv_mass);
+
+    __m128d d_momentum = _mm_set_pd(d_momentum_y, d_momentum_x);
+    d_momentum = _mm_mul_pd(d_momentum, _mm_mul_pd(_mm_set1_pd(dt), _mm_set1_pd(beta)));
+    
+    state_momentum = _mm_sub_pd(state_momentum, d_momentum);
+
+    __m128d v1 = _mm_mul_pd(state_momentum, inv_mass);
+
+    _mm_storeu_pd(m_state.momentum, state_momentum);
+    
+    v0 = _mm_mul_pd(v0, v0);
+    v1 = _mm_mul_pd(v1, v1);
+
+    v0 = _mm_sub_pd(v1, v0);
+    v0 = _mm_mul_pd(v0, _mm_mul_pd(_mm_set1_pd(0.5), m));
+
+    double result[2];
+    _mm_storeu_pd(result, v0);
+
+    m_state.E_k -= result[0];
+    m_state.E_k -= result[1];
+    if (m_state.E_k < 0) m_state.E_k = 0;
+
+#else
 
     const double p0 = dynamicPressure(m_dx, m_dy);
     const double p1 = dynamicPressure(-m_dx, -m_dy);
@@ -325,10 +409,44 @@ void GasSystem::updateVelocity(double dt, double beta) {
     m_state.E_k -= 0.5 * m * (v1_y * v1_y - v0_y * v0_y);
 
     if (m_state.E_k < 0) m_state.E_k = 0;
+
+#endif
 }
 
 void GasSystem::dissipateVelocity(double dt, double timeConstant) {
     if (n() == 0) return;
+
+#if SIMD
+
+    const double m = mass();
+    __m128d inv_mass = _mm_div_pd(_mm_set1_pd(1), _mm_set1_pd(m));
+    __m128d momentum = _mm_loadu_pd(m_state.momentum);
+    __m128d velocity = _mm_mul_pd(momentum, inv_mass);
+    __m128d velocity_squared = _mm_mul_pd(velocity, velocity);
+    double velocity_sqr;
+
+    __m128d dt_m = _mm_set1_pd(dt);
+    __m128d s = _mm_div_pd(dt_m, _mm_add_pd(dt_m, _mm_set1_pd(timeConstant)));
+
+    momentum = _mm_mul_pd(momentum, _mm_sub_pd(_mm_set1_pd(1), s));
+    _mm_storeu_pd(m_state.momentum, momentum);
+    
+    __m128d new_velocity = _mm_mul_pd(momentum, inv_mass);
+    __m128d new_velocity_squared = _mm_mul_pd(new_velocity, new_velocity);
+    double new_velocity_sqr;
+
+    double res[2];
+
+    _mm_storeu_pd(res, velocity_squared);
+    velocity_sqr = res[0] + res[1];
+    
+    _mm_storeu_pd(res, new_velocity_squared);
+    new_velocity_sqr = res[0] + res[1];
+
+    const double dE_k = 0.5 * m * (velocity_sqr - new_velocity_sqr);
+    m_state.E_k += dE_k;
+
+#else
 
     const double invMass = 1.0 / mass();
     const double velocity_x = m_state.momentum[0] * invMass;
@@ -347,8 +465,198 @@ void GasSystem::dissipateVelocity(double dt, double timeConstant) {
 
     const double dE_k = 0.5 * mass() * (velocity_squared - newVelocity_squared);
     m_state.E_k += dE_k;
+
+#endif
 }
 
+#define SIMD_FLOW false
+
+#if SIMD_FLOW
+double GasSystem::flow(const FlowParameters& params) {
+    GasSystem* source = nullptr, * sink = nullptr;
+    double sourcePressure = 0, sinkPressure = 0;
+    double dx, dy;
+    double sourceCrossSection = 0, sinkCrossSection = 0;
+    double direction = 0;
+
+    const double P_0 =
+        params.system_0->pressure()
+        + params.system_0->dynamicPressure(params.direction_x, params.direction_y);
+    const double P_1 =
+        params.system_1->pressure()
+        + params.system_1->dynamicPressure(-params.direction_x, -params.direction_y);
+
+    if (P_0 > P_1) {
+        dx = params.direction_x;
+        dy = params.direction_y;
+        source = params.system_0;
+        sink = params.system_1;
+        sourcePressure = P_0;
+        sinkPressure = P_1;
+        sourceCrossSection = params.crossSectionArea_0;
+        sinkCrossSection = params.crossSectionArea_1;
+        direction = 1.0;
+    }
+    else {
+        dx = -params.direction_x;
+        dy = -params.direction_y;
+        source = params.system_1;
+        sink = params.system_0;
+        sourcePressure = P_1;
+        sinkPressure = P_0;
+        sourceCrossSection = params.crossSectionArea_1;
+        sinkCrossSection = params.crossSectionArea_0;
+        direction = -1.0;
+    }
+
+    double flow = params.dt * flowRate(
+        params.k_flow,
+        sourcePressure,
+        sinkPressure,
+        source->temperature(),
+        sink->temperature(),
+        source->heatCapacityRatio(),
+        source->m_chokedFlowLimit,
+        source->m_chokedFlowFactorCached);
+
+    const double maxFlow = source->pressureEquilibriumMaxFlow(sink);
+    flow = clamp(flow, 0.0, 0.9 * source->n());
+
+    const double fraction = flow / source->n();
+    const double fractionVolume = fraction * source->volume();
+    const double fractionMass = fraction * source->mass();
+    const double remainingMass = (1 - fraction) * source->mass();
+
+    if (flow != 0) {
+        // - Stage 1
+        // Fraction flows from source to sink.
+
+        const double E_k_bulk_src0 = source->bulkKineticEnergy();
+        const double E_k_bulk_sink0 = sink->bulkKineticEnergy();
+
+        const double s0 = source->totalEnergy() + sink->totalEnergy();
+
+        const double E_k_per_mol = source->kineticEnergyPerMol();
+        sink->gainN(flow, E_k_per_mol, source->mix());
+        source->loseN(flow, E_k_per_mol);
+
+        const double s1 = source->totalEnergy() + sink->totalEnergy();
+
+        const double dp_x = source->m_state.momentum[0] * fraction;
+        const double dp_y = source->m_state.momentum[1] * fraction;
+        source->m_state.momentum[0] -= dp_x;
+        source->m_state.momentum[1] -= dp_y;
+
+        sink->m_state.momentum[0] += dp_x;
+        sink->m_state.momentum[1] += dp_y;
+
+        const double E_k_bulk_src1 = source->bulkKineticEnergy();
+        const double E_k_bulk_sink1 = sink->bulkKineticEnergy();
+
+        sink->m_state.E_k -= ((E_k_bulk_src1 + E_k_bulk_sink1) - (E_k_bulk_src0 + E_k_bulk_sink0));
+    }
+
+    const double sourceMass = source->mass();
+    const double invSourceMass = 1 / sourceMass;
+    const double sinkMass = sink->mass();
+    const double invSinkMass = 1 / sinkMass;
+
+    const double c_source = source->c();
+    const double c_sink = sink->c();
+
+    const double sourceInitialMomentum_x = source->m_state.momentum[0];
+    const double sourceInitialMomentum_y = source->m_state.momentum[1];
+
+    const double sinkInitialMomentum_x = sink->m_state.momentum[0];
+    const double sinkInitialMomentum_y = sink->m_state.momentum[1];
+
+    // Momentum in fraction
+
+    __m128d fractionMass_m = _mm_set1_pd(fractionMass);
+    if (sinkCrossSection != 0) {
+        const double sinkFractionVelocity =
+            clamp((fractionVolume / sinkCrossSection) / params.dt, 0.0, c_sink);
+
+        __m128d sinkfrvel = _mm_mul_pd(_mm_set1_pd(sinkFractionVelocity), _mm_set_pd(dy, dx));
+        sinkfrvel = _mm_mul_pd(sinkfrvel, fractionMass_m);
+
+        double res[2];
+        _mm_storeu_pd(res, sinkfrvel);
+        sink->m_state.momentum[0] += res[0];
+        sink->m_state.momentum[1] += res[1];
+    }
+
+    if (sourceCrossSection != 0 && sourceMass != 0) {
+        const double sourceFractionVelocity =
+            clamp((fractionVolume / sourceCrossSection) / params.dt, 0.0, c_source);
+        
+        __m128d sourcefrvel = _mm_mul_pd(_mm_set1_pd(sourceFractionVelocity), _mm_set_pd(dy, dx));
+        sourcefrvel = _mm_mul_pd(sourcefrvel, fractionMass_m);
+
+        double res[2];
+        _mm_storeu_pd(res, sourcefrvel);
+        sink->m_state.momentum[0] += res[0];
+        sink->m_state.momentum[1] += res[1];
+    }
+
+
+    if (sourceMass != 0) {
+        // Energy conservation
+        __m128d invSourceMass_m = _mm_set1_pd(invSourceMass);
+        __m128d sv0 = _mm_mul_pd(_mm_set_pd(sourceInitialMomentum_y, sourceInitialMomentum_x), invSourceMass_m);
+        __m128d sv1 = _mm_mul_pd(_mm_loadu_pd(source->m_state.momentum), invSourceMass_m);
+        
+        sv0 = _mm_mul_pd(sv0, sv0);
+        sv1 = _mm_mul_pd(sv1, sv1);
+
+        double sv0_p[2], sv1_p[2];
+        _mm_storeu_pd(sv0_p, sv0);
+        _mm_storeu_pd(sv1_p, sv1);
+
+        const double sourceMass2 = 0.5 * sourceMass;
+
+        source->m_state.E_k -=
+            sourceMass2
+            * (sv1_p[0] - sv0_p[0]);
+
+        source->m_state.E_k -=
+            sourceMass2
+            * (sv1_p[1] - sv0_p[1]);
+    }
+
+    if (sinkMass > 0) {
+        __m128d invSinkMass_m = _mm_set1_pd(invSinkMass);
+        __m128d sv0 = _mm_mul_pd(_mm_set_pd(sinkInitialMomentum_y, sinkInitialMomentum_x), invSinkMass_m);
+        __m128d sv1 = _mm_mul_pd(_mm_loadu_pd(sink->m_state.momentum), invSinkMass_m);
+
+        sv0 = _mm_mul_pd(sv0, sv0);
+        sv1 = _mm_mul_pd(sv1, sv1);
+
+        double sv0_p[2], sv1_p[2];
+        _mm_storeu_pd(sv0_p, sv0);
+        _mm_storeu_pd(sv1_p, sv1);
+        const double sinkMass2 = 0.5 * sinkMass;
+
+        sink->m_state.E_k -=
+            sinkMass2
+            * (sv1_p[0] - sv0_p[0]);
+
+        sink->m_state.E_k -=
+            sinkMass2
+            * (sv1_p[1] - sv0_p[1]);
+    }
+
+    if (sink->m_state.E_k < 0) {
+        sink->m_state.E_k = 0;
+    }
+
+    if (source->m_state.E_k < 0) {
+        source->m_state.E_k = 0;
+    }
+
+    return flow * direction;
+}
+#else
 double GasSystem::flow(const FlowParameters &params) {
     GasSystem *source = nullptr, *sink = nullptr;
     double sourcePressure = 0, sinkPressure = 0;
@@ -518,6 +826,7 @@ double GasSystem::flow(const FlowParameters &params) {
 
     return flow * direction;
 }
+#endif
 
 double GasSystem::flow(double k_flow, double dt, double P_env, double T_env, const Mix &mix) {
     const double maxFlow = pressureEquilibriumMaxFlow(P_env, T_env);
